@@ -3,11 +3,11 @@
 > **Resume instructions (fresh Claude — read this first):**
 >
 > 1. Read `CLAUDE.md` in repo root for the full status snapshot.
-> 2. We are mid-`superpowers:brainstorming`. Sections 1, 2 (rewritten, see below), and 3 are approved. **Next up is Section 4: Room Manager & Lobby** — pick up with the brainstorming skill there.
-> 3. After all design sections are approved, write the final design doc to `docs/superpowers/specs/YYYY-MM-DD-networking-design.md`, self-review, get user approval, then invoke `superpowers:writing-plans`.
-> 4. Sections 1 and 3 have already been partially implemented as an offline hot-seat demo — see the "Implementation status since brainstorming started" section below so you don't re-discuss solved problems.
+> 2. Sections 1, 2 (rewritten as 3), 3, and **4 are approved**. Section 4 spec lives at `docs/superpowers/specs/2026-04-17-room-manager-lobby-design.md`. Next up is **Section 5: AI Bot Engine** — invoke `superpowers:brainstorming` and pick up there.
+> 3. After all design sections are approved, each gets its own spec doc under `docs/superpowers/specs/`, self-review, user approval, then `superpowers:writing-plans`.
+> 4. Sections 1 and 3 are partially implemented as an offline hot-seat demo — see "Implementation status" below so you don't re-discuss solved problems.
 >
-> **Don't re-brainstorm approved sections.** Just confirm which section we're on, ask clarifying questions for Section 4, and continue.
+> **Don't re-brainstorm approved sections.** Confirm which section is next, ask clarifying questions there, and continue.
 
 ## Implementation status since brainstorming started
 
@@ -21,7 +21,9 @@ A full offline hot-seat demo was built between brainstorming Section 3 and retur
 - **Modals** — `NewGameModal`, `RulesetInfo`, `ConfirmDialog` (end-turn confirm).
 - **Repo** — pushed to https://github.com/mojoro/skip-bo (public). `main` is the single branch; `demo-snapshot` preserved locally.
 
-**Still to build:** server, client WS hook, room manager + lobby (Section 4), AI bots (Section 5), AWS deploy (Section 7), testing strategy for the network layer (Section 8). UI polish list lives in `CLAUDE.md`.
+- **Room Manager + Lobby (Section 4)** — designed, **not yet implemented**. Full spec at `docs/superpowers/specs/2026-04-17-room-manager-lobby-design.md`. REST endpoints (Zalando-aligned, versioned `/v1/`), SSE lobby stream with deltas, host-controlled slots, 30-min idle + 5-min post-game cleanup, pm2 supervision + graceful shutdown, Problem+JSON errors, camelCase JSON, `Authorization: Bearer <sessionId>`. OpenAPI 3.1 yaml is a deliverable at build time.
+
+**Still to build:** server, client WS hook, room manager + lobby implementation (Section 4 spec'd), AI bots (Section 5), frontend architecture write-up (Section 6), AWS deploy (Section 7), testing strategy for the network layer (Section 8). UI polish list lives in `CLAUDE.md`.
 
 ## Project Context
 
@@ -172,11 +174,8 @@ type ServerMessage =
 
 ## Remaining Design Sections (NOT YET DISCUSSED)
 
-### Section 4: Room Manager & Lobby
-- How rooms are created, listed, joined
-- HTTP endpoints for lobby operations
-- Room lifecycle (create → fill → playing → finished → cleanup)
-- How the lobby page polls/subscribes for room list updates
+### Section 4: Room Manager & Lobby — **APPROVED**
+Full spec: `docs/superpowers/specs/2026-04-17-room-manager-lobby-design.md`. See "Implementation status" above for the summary.
 
 ### Section 5: AI Bot Engine
 - Rule-based strategy
