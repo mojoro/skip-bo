@@ -220,27 +220,32 @@ export default function Home() {
     <div className="wood-frame min-h-screen p-2 sm:p-3">
       <div className="felt-surface relative rounded-xl overflow-hidden h-[calc(100vh-24px)] sm:h-[calc(100vh-32px)]">
         {/* Header chrome */}
-        <header className="absolute top-3 left-4 right-4 z-20 flex items-center justify-between text-white">
-          <h1 className="text-lg font-bold tracking-widest">
+        <header className="absolute top-2 sm:top-3 left-3 right-3 sm:left-4 sm:right-4 z-20 flex items-center justify-between text-white gap-2">
+          <h1 className="text-base sm:text-lg font-bold tracking-widest shrink-0">
             SKIP<span className="text-[var(--gold)]">·</span>BO
           </h1>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs">
             <button
               onClick={() => setRulesetOpen(true)}
-              className="bg-black/40 hover:bg-black/55 border border-white/15 px-3 py-1 rounded flex items-center gap-1"
+              className="bg-black/40 hover:bg-black/55 border border-white/15 px-2 sm:px-3 py-1 rounded flex items-center gap-1"
               title="View ruleset"
             >
-              <span>ruleset: {state.config.ruleset}</span>
+              <span className="hidden sm:inline">ruleset: </span>
+              <span>{state.config.ruleset}</span>
               <span className="text-[var(--gold)]">ⓘ</span>
             </button>
             {partnershipActive && (
-              <span className="bg-black/40 border border-white/15 px-2 py-1 rounded">
-                partnerships
+              <span
+                className="bg-black/40 border border-white/15 px-1.5 sm:px-2 py-1 rounded"
+                title="Partnership mode"
+              >
+                <span className="hidden sm:inline">partnerships</span>
+                <span className="sm:hidden">👥</span>
               </span>
             )}
             <button
               onClick={() => setNewGameOpen(true)}
-              className="bg-[var(--gold)] text-stone-900 font-semibold hover:brightness-110 px-3 py-1 rounded"
+              className="bg-[var(--gold)] text-stone-900 font-semibold hover:brightness-110 px-2 sm:px-3 py-1 rounded whitespace-nowrap"
             >
               New Game
             </button>
@@ -248,9 +253,9 @@ export default function Home() {
         </header>
 
         {/* Status ribbon */}
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10">
+        <div className="absolute top-10 sm:top-14 left-2 right-2 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-10 flex justify-center pointer-events-none">
           <div
-            className="px-4 py-1.5 rounded-full border border-white/10 text-xs text-white backdrop-blur-sm"
+            className="px-3 sm:px-4 py-1 sm:py-1.5 rounded-full border border-white/10 text-[11px] sm:text-xs text-white backdrop-blur-sm text-center"
             style={{ background: 'rgba(0,0,0,0.45)' }}
           >
             {state.phase === 'finished' ? (
@@ -273,60 +278,132 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Central play surface */}
-        <TableCenter
-          buildPiles={state.buildPiles}
-          drawPileCount={state.drawPile.length}
-          completedPileCount={state.completedBuildPiles.length}
-          config={state.config}
-          onClickBuildPile={onClickBuildPile}
-        />
+        {/* Desktop: absolute seats around the table center */}
+        <div className="hidden md:contents">
+          <TableCenter
+            buildPiles={state.buildPiles}
+            drawPileCount={state.drawPile.length}
+            completedPileCount={state.completedBuildPiles.length}
+            config={state.config}
+            onClickBuildPile={onClickBuildPile}
+          />
+          {players.map((p, i) => {
+            const isActive = i === activeIdx;
+            const teamIndex = teamForPlayerId(p.id);
+            const teamColor =
+              teamIndex !== null ? TEAM_COLORS[teamIndex % TEAM_COLORS.length] : null;
+            return (
+              <Seat
+                key={p.id}
+                position={seatOf(i)}
+                player={p}
+                playerIndex={i}
+                isActive={isActive}
+                isYou={isActive}
+                teamIndex={teamIndex}
+                teamColor={teamColor}
+                selection={isActive ? selection : { kind: 'none' }}
+                cardSize={players.length > 4 ? 'sm' : 'md'}
+                onSelectHand={(idx) =>
+                  setSelection((prev) =>
+                    prev.kind === 'hand' && prev.index === idx
+                      ? { kind: 'none' }
+                      : { kind: 'hand', index: idx },
+                  )
+                }
+                onSelectStock={() => {
+                  if (activePlayer.stockPile.length === 0) return;
+                  setSelection((prev) =>
+                    prev.kind === 'stock' ? { kind: 'none' } : { kind: 'stock' },
+                  );
+                }}
+                onSelectDiscard={(pileIdx) => {
+                  if (activePlayer.discardPiles[pileIdx].length === 0) return;
+                  setSelection((prev) =>
+                    prev.kind === 'discard' && prev.pileIndex === pileIdx
+                      ? { kind: 'none' }
+                      : { kind: 'discard', pileIndex: pileIdx },
+                  );
+                }}
+                onClickDiscardTarget={onClickOwnDiscardPile}
+              />
+            );
+          })}
+        </div>
 
-        {/* Seats */}
-        {players.map((p, i) => {
-          const isActive = i === activeIdx;
-          const isYou = isActive; // hot-seat: always show active player's cards
-          const teamIndex = teamForPlayerId(p.id);
-          const teamColor =
-            teamIndex !== null ? TEAM_COLORS[teamIndex % TEAM_COLORS.length] : null;
-          const position = seatOf(i);
-          return (
-            <Seat
-              key={p.id}
-              position={position}
-              player={p}
-              playerIndex={i}
-              isActive={isActive}
-              isYou={isYou}
-              teamIndex={teamIndex}
-              teamColor={teamColor}
-              selection={isActive ? selection : { kind: 'none' }}
-              cardSize={players.length > 4 ? 'sm' : 'md'}
-              onSelectHand={(idx) =>
-                setSelection((prev) =>
-                  prev.kind === 'hand' && prev.index === idx
-                    ? { kind: 'none' }
-                    : { kind: 'hand', index: idx },
-                )
-              }
-              onSelectStock={() => {
-                if (activePlayer.stockPile.length === 0) return;
-                setSelection((prev) =>
-                  prev.kind === 'stock' ? { kind: 'none' } : { kind: 'stock' },
-                );
-              }}
-              onSelectDiscard={(pileIdx) => {
-                if (activePlayer.discardPiles[pileIdx].length === 0) return;
-                setSelection((prev) =>
-                  prev.kind === 'discard' && prev.pileIndex === pileIdx
-                    ? { kind: 'none' }
-                    : { kind: 'discard', pileIndex: pileIdx },
-                );
-              }}
-              onClickDiscardTarget={onClickOwnDiscardPile}
+        {/* Mobile: stacked column — opponents, build piles, you */}
+        <div className="md:hidden absolute inset-0 pt-20 pb-3 px-2 flex flex-col gap-2 overflow-y-auto">
+          {players
+            .map((p, i) => ({ p, i }))
+            .filter(({ i }) => i !== activeIdx)
+            .map(({ p, i }) => {
+              const teamIndex = teamForPlayerId(p.id);
+              const teamColor =
+                teamIndex !== null ? TEAM_COLORS[teamIndex % TEAM_COLORS.length] : null;
+              return (
+                <Seat
+                  key={p.id}
+                  player={p}
+                  playerIndex={i}
+                  isActive={false}
+                  isYou={false}
+                  teamIndex={teamIndex}
+                  teamColor={teamColor}
+                  selection={{ kind: 'none' }}
+                  cardSize="sm"
+                />
+              );
+            })}
+          <div className="my-1">
+            <TableCenter
+              buildPiles={state.buildPiles}
+              drawPileCount={state.drawPile.length}
+              completedPileCount={state.completedBuildPiles.length}
+              config={state.config}
+              onClickBuildPile={onClickBuildPile}
             />
-          );
-        })}
+          </div>
+          {(() => {
+            const teamIndex = teamForPlayerId(activePlayer.id);
+            const teamColor =
+              teamIndex !== null ? TEAM_COLORS[teamIndex % TEAM_COLORS.length] : null;
+            return (
+              <Seat
+                key={`${activePlayer.id}-mobile`}
+                player={activePlayer}
+                playerIndex={activeIdx}
+                isActive={true}
+                isYou={true}
+                teamIndex={teamIndex}
+                teamColor={teamColor}
+                selection={selection}
+                cardSize="sm"
+                onSelectHand={(idx) =>
+                  setSelection((prev) =>
+                    prev.kind === 'hand' && prev.index === idx
+                      ? { kind: 'none' }
+                      : { kind: 'hand', index: idx },
+                  )
+                }
+                onSelectStock={() => {
+                  if (activePlayer.stockPile.length === 0) return;
+                  setSelection((prev) =>
+                    prev.kind === 'stock' ? { kind: 'none' } : { kind: 'stock' },
+                  );
+                }}
+                onSelectDiscard={(pileIdx) => {
+                  if (activePlayer.discardPiles[pileIdx].length === 0) return;
+                  setSelection((prev) =>
+                    prev.kind === 'discard' && prev.pileIndex === pileIdx
+                      ? { kind: 'none' }
+                      : { kind: 'discard', pileIndex: pileIdx },
+                  );
+                }}
+                onClickDiscardTarget={onClickOwnDiscardPile}
+              />
+            );
+          })()}
+        </div>
       </div>
 
       <NewGameModal
