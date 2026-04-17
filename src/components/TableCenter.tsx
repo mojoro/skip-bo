@@ -35,9 +35,9 @@ export default function TableCenter({
         {/* Draw pile */}
         <div className="flex flex-col items-center gap-1">
           {drawPileCount > 0 ? (
-            <Card card={null} faceDown size="lg" stacked={Math.min(drawPileCount, 4)} />
+            <Card card={null} faceDown size="md" stacked={Math.min(drawPileCount, 4)} />
           ) : (
-            <Card card={null} size="lg" label="empty" />
+            <Card card={null} size="md" label="empty" />
           )}
           <span className="text-[10px] text-white/80 tracking-widest font-semibold">
             DRAW · {drawPileCount}
@@ -45,7 +45,7 @@ export default function TableCenter({
         </div>
 
         {/* Build piles */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {buildPiles.map((pile, i) => {
             const top = pile.cards[pile.cards.length - 1] ?? null;
             const sub = pile.cards.length === 0
@@ -60,12 +60,11 @@ export default function TableCenter({
               >
                 <Card
                   card={top}
-                  size="lg"
-                  label={top ? undefined : emptyLabel}
+                  size="md"
                   stacked={pile.cards.length}
                   onClick={() => onClickBuildPile(i)}
                 />
-                <span className="text-[10px] text-white/75 tracking-wider">
+                <span className="text-[9px] sm:text-[10px] text-white/75 tracking-wider text-center leading-tight w-16 sm:w-auto">
                   {sub}
                 </span>
               </DroppableZone>
@@ -77,7 +76,7 @@ export default function TableCenter({
         <div className="flex flex-col items-center gap-1 opacity-80">
           {completedPileCount > 0 ? (
             <div
-              className="w-20 h-28 rounded-md border border-white/20 flex items-center justify-center text-white/70 text-xs font-semibold"
+              className="w-16 h-24 rounded-md border border-white/20 flex items-center justify-center text-white/70 text-xs font-semibold"
               style={{
                 background:
                   'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(0,0,0,0.35))',
@@ -86,7 +85,7 @@ export default function TableCenter({
               {completedPileCount}
             </div>
           ) : (
-            <Card card={null} size="lg" label="completed" />
+            <Card card={null} size="md" />
           )}
           <span className="text-[10px] text-white/60 tracking-widest">
             COMPLETED
