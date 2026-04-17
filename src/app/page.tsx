@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { Dispatch, SetStateAction, useCallback, useEffect, useMemo, useState } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { DragDropProvider, DragSourceData, DropTargetData } from '@/lib/dnd';
 import NewGameModal, {
@@ -56,7 +56,31 @@ function defaultInitialGame(): GameState {
 }
 
 export default function Home() {
-  const [state, setState] = useState<GameState>(() => defaultInitialGame());
+  // Defer createGame() to the client so its Math.random() seed matches between
+  // hydration passes. Server + first client render show a blank felt; an effect
+  // populates the game after mount.
+  const [state, setState] = useState<GameState | null>(null);
+  useEffect(() => {
+    setState((prev) => prev ?? defaultInitialGame());
+  }, []);
+
+  if (!state) {
+    return (
+      <div className="wood-frame min-h-screen p-2 sm:p-3">
+        <div className="felt-surface relative rounded-xl overflow-hidden h-[calc(100vh-24px)] sm:h-[calc(100vh-32px)]" />
+      </div>
+    );
+  }
+
+  return <Board state={state} setState={setState} />;
+}
+
+interface BoardProps {
+  state: GameState;
+  setState: Dispatch<SetStateAction<GameState | null>>;
+}
+
+function Board({ state, setState }: BoardProps) {
   const [selection, setSelection] = useState<SeatSelection>({ kind: 'none' });
   const [message, setMessage] = useState<string>('');
   const [newGameOpen, setNewGameOpen] = useState(false);
