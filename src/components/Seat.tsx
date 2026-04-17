@@ -110,7 +110,10 @@ export default function Seat({
             {/* Stock pile */}
             <div className="flex flex-col items-center gap-1">
               {stockTop ? (
-                <Card
+                <DraggableCard
+                  id={`stock-${playerIndex}`}
+                  data={{ source: { from: 'stock', playerIndex } }}
+                  disabled={!isActive}
                   card={stockTop}
                   size={cardSize}
                   highlighted={isActive && selection.kind === 'stock'}
@@ -162,26 +165,38 @@ export default function Seat({
                   const top = pile[pile.length - 1] ?? null;
                   const isSelected =
                     isActive && selection.kind === 'discard' && selection.pileIndex === i;
+                  const handleClick = isActive
+                    ? () => {
+                        if (selection.kind === 'hand') {
+                          onClickDiscardTarget?.(i);
+                        } else {
+                          onSelectDiscard?.(i);
+                        }
+                      }
+                    : undefined;
                   return (
                     <div key={i} className="flex flex-col items-center gap-0.5">
-                      <Card
-                        card={top}
-                        size="sm"
-                        highlighted={isSelected}
-                        label={top ? undefined : ''}
-                        stacked={pile.length}
-                        onClick={
-                          isActive
-                            ? () => {
-                                if (selection.kind === 'hand') {
-                                  onClickDiscardTarget?.(i);
-                                } else {
-                                  onSelectDiscard?.(i);
-                                }
-                              }
-                            : undefined
-                        }
-                      />
+                      {top ? (
+                        <DraggableCard
+                          id={`discard-src-${playerIndex}-${i}`}
+                          data={{
+                            source: { from: 'discard', playerIndex, pileIndex: i },
+                          }}
+                          disabled={!isActive || selection.kind === 'hand'}
+                          card={top}
+                          size="sm"
+                          highlighted={isSelected}
+                          stacked={pile.length}
+                          onClick={handleClick}
+                        />
+                      ) : (
+                        <Card
+                          card={null}
+                          size="sm"
+                          label=""
+                          onClick={handleClick}
+                        />
+                      )}
                       <span className="text-[9px] text-white/50">{pile.length}</span>
                     </div>
                   );
