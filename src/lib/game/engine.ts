@@ -1,5 +1,6 @@
 import {
   BUILD_PILE_COUNT,
+  BuildDirection,
   BuildPile,
   Card,
   CONFIG_LIMITS,
@@ -12,7 +13,7 @@ import {
   defaultConfigForRuleset,
 } from './types';
 import { createShuffledDeck } from './deck';
-import { mulberry32, randomSeed } from './rng';
+import { mulberry32, randomSeed, shuffleInPlace } from './rng';
 
 export interface CreateGameInput {
   players: { id: string; name: string }[];
@@ -148,4 +149,76 @@ function playersOnSameTeam(state: GameState, aIdx: number, bIdx: number): boolea
   const ta = teamIndexOfPlayer(state, pa.id);
   const tb = teamIndexOfPlayer(state, pb.id);
   return ta !== null && tb !== null && ta === tb;
+}
+
+function nextRequiredValueForPile(pile: BuildPile): number | null {
+  if (pile.cards.length === 0 || pile.direction === null) return null;
+  if (pile.direction === 'asc') return pile.cards.length + 1;
+  return 12 - pile.cards.length;
+}
+
+function canPlayCardOnPile(
+  pile: BuildPile,
+  card: Card,
+  config: GameConfig,
+  declaredDirection: BuildDirection | undefined,
+): { ok: true; resolvedDirection: BuildDirection } | { ok: false; error: string } {
+  if (pile.cards.length === 0 || pile.direction === null) {
+    if (card.value === WILD) {
+      if (config.bidirectionalBuild) {
+        if (declaredDirection !== 'asc' && declaredDirection !== 'desc') {
+          return {
+            ok: false,
+            error: 'declare direction when playing wild on empty bidirectional pile',
+          };
+        }
+        return { ok: true, resolvedDirection: declaredDirection };
+      }
+      return { ok: true, resolvedDirection: 'asc' };
+    }
+    if (card.value === 1) return { ok: true, resolvedDirection: 'asc' };
+    if (card.value === 12 && config.bidirectionalBuild) {
+      return { ok: true, resolvedDirection: 'desc' };
+    }
+    if (card.value === 12 && !config.bidirectionalBuild) {
+      return { ok: false, error: 'descending piles not allowed in official rules' };
+    }
+    return { ok: false, error: `empty pile must start with 1${config.bidirectionalBuild ? ' or 12' : ''} (or wild)` };
+  }
+  const required = nextRequiredValueForPile(pile);
+  if (required === null) {
+    return { ok: false, error: 'pile state invalid' };
+  }
+  if (card.value === WILD) return { ok: true, resolvedDirection: pile.direction };
+  if (card.value === required) return { ok: true, resolvedDirection: pile.direction };
+  return { ok: false, error: `pile requires ${required}, card is ${card.value}` };
+}
+
+function refillDrawPileIfEmpty(state: GameState, rng: () => number): void {
+  if (state.drawPile.length > 0) return;
+  if (state.completedBuildPiles.length === 0) return;
+  state.drawPile = shuffleInPlace([...state.completedBuildPiles], rng);
+  state.completedBuildPiles = [];
+}
+
+function drawFromPile(state: GameState, rng: () => number): Card | null {
+  if (state.drawPile.length === 0) refillDrawPileIfEmpty(state, rng);
+  return state.drawPile.shift() ?? null;
+}
+
+function refillHand(state: GameState, playerIndex: number, rng: () => number): void {
+  const p = state.players[playerIndex];
+  while (p.hand.length < state.config.handSize) {
+    const card = drawFromPile(state, rng);
+    if (!card) break;
+    p.hand.push(card);
+  }
+}
+
+function maybeCompletePile(state: GameState, buildPileIndex: number): void {
+  const pile = state.buildPiles[buildPileIndex];
+  if (pile.cards.length === 12) {
+    state.completedBuildPiles.push(...pile.cards);
+    state.buildPiles[buildPileIndex] = { cards: [], direction: null };
+  }
 }
