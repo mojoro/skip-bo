@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { DragDropProvider } from '@dnd-kit/react';
+import { DragDropProvider, DragOverlay } from '@dnd-kit/react';
+import Card from '@/components/Card';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import NewGameModal, {
   NewGameSettings,
@@ -12,7 +13,7 @@ import RulesetInfo from '@/components/RulesetInfo';
 import Seat, { SeatSelection } from '@/components/Seat';
 import TableCenter from '@/components/TableCenter';
 import { applyAction, createGame } from '@/lib/game/engine';
-import { Card, CardSource, GameAction, GameState, WILD } from '@/lib/game/types';
+import { Card as CardType, CardSource, GameAction, GameState, WILD } from '@/lib/game/types';
 import { getSeatPositions } from '@/lib/layout/seating';
 import { DragSourceData, DropTargetData } from '@/lib/dnd';
 
@@ -124,7 +125,7 @@ export default function Home() {
     setNewGameOpen(false);
   };
 
-  const resolveCardForSource = (source: CardSource): Card | null => {
+  const resolveCardForSource = (source: CardSource): CardType | null => {
     if (source.from === 'hand') return activePlayer.hand[source.index] ?? null;
     if (source.from === 'stock') {
       const p = state.players[source.playerIndex];
@@ -215,6 +216,13 @@ export default function Home() {
 
   return (
     <DragDropProvider onDragEnd={onDragEnd}>
+    <DragOverlay>
+      {(source) => {
+        const data = source?.data as DragSourceData | undefined;
+        if (!data) return null;
+        return <Card card={data.card} size="md" />;
+      }}
+    </DragOverlay>
     <div className="wood-frame min-h-screen p-2 sm:p-3">
       <div className="felt-surface relative rounded-xl overflow-hidden h-[calc(100vh-24px)] sm:h-[calc(100vh-32px)]">
         {/* Header chrome */}

@@ -2,33 +2,35 @@
 
 import { useDraggable } from '@dnd-kit/react';
 import Card from './Card';
-import { Card as CardType } from '@/lib/game/types';
-import { DragSourceData } from '@/lib/dnd';
+import { Card as CardType, CardSource } from '@/lib/game/types';
 
 interface DraggableCardProps {
   id: string;
-  data: DragSourceData;
+  source: CardSource;
   disabled?: boolean;
-  card: CardType | null;
-  faceDown?: boolean;
+  card: CardType;
   size?: 'sm' | 'md' | 'lg';
   highlighted?: boolean;
   dim?: boolean;
   onClick?: () => void;
-  label?: string;
   stacked?: number;
 }
 
 export default function DraggableCard({
   id,
-  data,
+  source,
   disabled,
+  card,
   ...cardProps
 }: DraggableCardProps) {
-  const { ref, isDragging } = useDraggable({ id, data, disabled });
+  const { ref, isDragging } = useDraggable({
+    id,
+    data: { source, card },
+    disabled,
+  });
   return (
-    <div ref={ref} className={isDragging ? 'opacity-50' : ''}>
-      <Card {...cardProps} />
+    <div ref={ref} className={isDragging ? 'opacity-40' : ''}>
+      <Card card={card} {...cardProps} />
     </div>
   );
 }

@@ -113,7 +113,7 @@ export default function Seat({
               {stockTop ? (
                 <DraggableCard
                   id={`stock-${playerIndex}`}
-                  data={{ source: { from: 'stock', playerIndex } }}
+                  source={{ from: 'stock', playerIndex }}
                   disabled={!isActive}
                   card={stockTop}
                   size={cardSize}
@@ -140,7 +140,7 @@ export default function Seat({
                     <DraggableCard
                       key={c.id}
                       id={`hand-${playerIndex}-${i}`}
-                      data={{ source: { from: 'hand', index: i } }}
+                      source={{ from: 'hand', index: i }}
                       disabled={!isActive}
                       card={c}
                       size={cardSize}
@@ -178,9 +178,7 @@ export default function Seat({
                   const card = top ? (
                     <DraggableCard
                       id={`discard-src-${playerIndex}-${i}`}
-                      data={{
-                        source: { from: 'discard', playerIndex, pileIndex: i },
-                      }}
+                      source={{ from: 'discard', playerIndex, pileIndex: i }}
                       disabled={!isActive || selection.kind === 'hand'}
                       card={top}
                       size="sm"

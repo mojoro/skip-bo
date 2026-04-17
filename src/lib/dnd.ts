@@ -1,6 +1,6 @@
-import { CardSource } from './game/types';
+import { Card, CardSource } from './game/types';
 
-export type DragSourceData = { source: CardSource };
+export type DragSourceData = { source: CardSource; card: Card };
 
 export type DropTargetData =
   | { kind: 'build'; index: number }
