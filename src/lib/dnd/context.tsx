@@ -141,20 +141,22 @@ export function DragDropProvider({ onDragEnd, children }: DragDropProviderProps)
     setHoveredTargetId(null);
   }, []);
 
-  const endDrag = useCallback((outcome: 'drop' | 'cancel') => {
-    setDrag((current) => {
-      if (!current) return null;
-      if (outcome === 'drop') {
+  const endDrag = useCallback(
+    (outcome: 'drop' | 'cancel') => {
+      if (drag && outcome === 'drop') {
         const target =
           hoveredTargetId !== null
             ? targetsRef.current.get(hoveredTargetId)?.data ?? null
             : null;
-        onDragEndRef.current?.(current.sourceData, target);
+        // Fire before clearing drag state so the callback sees valid data and
+        // so its setState calls don't land during our reducer phase.
+        onDragEndRef.current?.(drag.sourceData, target);
       }
-      return null;
-    });
-    setHoveredTargetId(null);
-  }, [hoveredTargetId]);
+      setDrag(null);
+      setHoveredTargetId(null);
+    },
+    [drag, hoveredTargetId],
+  );
 
   const endDragRef = useRef(endDrag);
   endDragRef.current = endDrag;
