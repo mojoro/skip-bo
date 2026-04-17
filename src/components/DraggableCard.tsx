@@ -2,6 +2,7 @@
 
 import Card from './Card';
 import { Card as CardType, CardSource } from '@/lib/game/types';
+import { useDraggable } from '@/lib/dnd';
 
 interface DraggableCardProps {
   id: string;
@@ -16,10 +17,24 @@ interface DraggableCardProps {
 }
 
 export default function DraggableCard({
-  id: _id,
-  source: _source,
-  disabled: _disabled,
+  id,
+  source,
+  disabled,
+  card,
   ...cardProps
 }: DraggableCardProps) {
-  return <Card {...cardProps} />;
+  const { ref, isDragging } = useDraggable({
+    id,
+    data: { source, card },
+    disabled,
+  });
+  return (
+    <div
+      ref={ref}
+      style={{ touchAction: 'none' }}
+      className={isDragging ? 'opacity-30' : ''}
+    >
+      <Card card={card} {...cardProps} />
+    </div>
+  );
 }
