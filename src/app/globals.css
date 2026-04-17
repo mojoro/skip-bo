@@ -83,4 +83,12 @@ body {
   color: #f3f4f6;
   font-family: ui-sans-serif, system-ui, -apple-system, Arial, Helvetica, sans-serif;
   overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea {
+  user-select: auto;
+  -webkit-user-select: auto;
 }
