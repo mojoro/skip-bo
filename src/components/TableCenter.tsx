@@ -1,0 +1,92 @@
+'use client';
+
+import Card from '@/components/Card';
+import { BuildPile, GameConfig } from '@/lib/game/types';
+
+interface TableCenterProps {
+  buildPiles: BuildPile[];
+  drawPileCount: number;
+  completedPileCount: number;
+  config: GameConfig;
+  onClickBuildPile: (index: number) => void;
+}
+
+export default function TableCenter({
+  buildPiles,
+  drawPileCount,
+  completedPileCount,
+  config,
+  onClickBuildPile,
+}: TableCenterProps) {
+  const emptyLabel = config.bidirectionalBuild ? 'START 1 / 12 / WILD' : 'START 1 / WILD';
+
+  return (
+    <div
+      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl px-8 py-6 table-inset"
+      style={{
+        background:
+          'radial-gradient(circle at 50% 35%, rgba(255,255,255,0.08), rgba(0,0,0,0.25))',
+        boxShadow:
+          'inset 0 0 40px rgba(0,0,0,0.6), 0 10px 30px rgba(0,0,0,0.45)',
+      }}
+    >
+      <div className="flex items-center gap-6">
+        {/* Draw pile */}
+        <div className="flex flex-col items-center gap-1">
+          {drawPileCount > 0 ? (
+            <Card card={null} faceDown size="lg" stacked={Math.min(drawPileCount, 4)} />
+          ) : (
+            <Card card={null} size="lg" label="empty" />
+          )}
+          <span className="text-[10px] text-white/80 tracking-widest font-semibold">
+            DRAW · {drawPileCount}
+          </span>
+        </div>
+
+        {/* Build piles */}
+        <div className="flex items-center gap-3">
+          {buildPiles.map((pile, i) => {
+            const top = pile.cards[pile.cards.length - 1] ?? null;
+            const sub = pile.cards.length === 0
+              ? emptyLabel
+              : `${pile.direction?.toUpperCase()} · ${pile.cards.length}/12`;
+            return (
+              <div key={i} className="flex flex-col items-center gap-1">
+                <Card
+                  card={top}
+                  size="lg"
+                  label={top ? undefined : emptyLabel}
+                  stacked={pile.cards.length}
+                  onClick={() => onClickBuildPile(i)}
+                />
+                <span className="text-[10px] text-white/75 tracking-wider">
+                  {sub}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Completed piles */}
+        <div className="flex flex-col items-center gap-1 opacity-80">
+          {completedPileCount > 0 ? (
+            <div
+              className="w-20 h-28 rounded-md border border-white/20 flex items-center justify-center text-white/70 text-xs font-semibold"
+              style={{
+                background:
+                  'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(0,0,0,0.35))',
+              }}
+            >
+              {completedPileCount}
+            </div>
+          ) : (
+            <Card card={null} size="lg" label="completed" />
+          )}
+          <span className="text-[10px] text-white/60 tracking-widest">
+            COMPLETED
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
