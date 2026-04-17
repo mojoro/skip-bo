@@ -2,6 +2,7 @@
 
 import Card from '@/components/Card';
 import DroppableZone from '@/components/DroppableZone';
+import WildDirectionPicker from '@/components/WildDirectionPicker';
 import { BuildPile, GameConfig } from '@/lib/game/types';
 
 interface TableCenterProps {
@@ -10,6 +11,9 @@ interface TableCenterProps {
   completedPileCount: number;
   config: GameConfig;
   onClickBuildPile: (index: number) => void;
+  pendingWildBuildPileIndex?: number | null;
+  onPickWildDirection?: (direction: 'asc' | 'desc') => void;
+  onCancelWildPlay?: () => void;
 }
 
 export default function TableCenter({
@@ -18,6 +22,9 @@ export default function TableCenter({
   completedPileCount,
   config,
   onClickBuildPile,
+  pendingWildBuildPileIndex,
+  onPickWildDirection,
+  onCancelWildPlay,
 }: TableCenterProps) {
   const emptyLabel = config.bidirectionalBuild ? 'START 1 / 12 / WILD' : 'START 1 / WILD';
 
@@ -51,6 +58,7 @@ export default function TableCenter({
             const sub = pile.cards.length === 0
               ? emptyLabel
               : `${pile.direction?.toUpperCase()} · ${pile.cards.length}/12`;
+            const isPendingWild = pendingWildBuildPileIndex === i;
             return (
               <DroppableZone
                 key={i}
@@ -58,14 +66,23 @@ export default function TableCenter({
                 data={{ kind: 'build', index: i }}
                 className="flex flex-col items-center gap-1"
               >
-                <Card
-                  card={top}
-                  size="md"
-                  stacked={pile.cards.length}
-                  onClick={() => onClickBuildPile(i)}
-                />
+                {isPendingWild && onPickWildDirection && onCancelWildPlay ? (
+                  <WildDirectionPicker
+                    size="md"
+                    onPickAsc={() => onPickWildDirection('asc')}
+                    onPickDesc={() => onPickWildDirection('desc')}
+                    onCancel={onCancelWildPlay}
+                  />
+                ) : (
+                  <Card
+                    card={top}
+                    size="md"
+                    stacked={pile.cards.length}
+                    onClick={() => onClickBuildPile(i)}
+                  />
+                )}
                 <span className="text-[9px] sm:text-[10px] text-white/75 tracking-wider text-center leading-tight w-16 sm:w-auto">
-                  {sub}
+                  {isPendingWild ? 'pick direction' : sub}
                 </span>
               </DroppableZone>
             );

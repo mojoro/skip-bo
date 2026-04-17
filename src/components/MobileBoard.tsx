@@ -4,6 +4,7 @@ import Card from '@/components/Card';
 import DraggableCard from '@/components/DraggableCard';
 import DroppableZone from '@/components/DroppableZone';
 import MobileOpponentStrip from '@/components/MobileOpponentStrip';
+import WildDirectionPicker from '@/components/WildDirectionPicker';
 import { Card as CardType, GameState, PlayerState } from '@/lib/game/types';
 import { SeatSelection } from '@/components/Seat';
 
@@ -19,6 +20,9 @@ interface MobileBoardProps {
   onSelectDiscard: (pileIdx: number) => void;
   onClickBuildPile: (index: number) => void;
   onClickOwnDiscardPile: (pileIdx: number) => void;
+  pendingWildBuildPileIndex?: number | null;
+  onPickWildDirection?: (direction: 'asc' | 'desc') => void;
+  onCancelWildPlay?: () => void;
 }
 
 export default function MobileBoard({
@@ -33,6 +37,9 @@ export default function MobileBoard({
   onSelectDiscard,
   onClickBuildPile,
   onClickOwnDiscardPile,
+  pendingWildBuildPileIndex,
+  onPickWildDirection,
+  onCancelWildPlay,
 }: MobileBoardProps) {
   const yourStockTop: CardType | null =
     activePlayer.stockPile.length > 0
@@ -99,6 +106,7 @@ export default function MobileBoard({
               pile.cards.length === 0
                 ? emptyLabel
                 : `${pile.direction === 'asc' ? '↑' : '↓'}${pile.cards.length}`;
+            const isPendingWild = pendingWildBuildPileIndex === i;
             return (
               <DroppableZone
                 key={i}
@@ -106,13 +114,24 @@ export default function MobileBoard({
                 data={{ kind: 'build', index: i }}
                 className="flex flex-col items-center gap-0.5"
               >
-                <Card
-                  card={top}
-                  size="md"
-                  stacked={pile.cards.length}
-                  onClick={() => onClickBuildPile(i)}
-                />
-                <span className="text-[9px] text-white/70 whitespace-nowrap">{sub}</span>
+                {isPendingWild && onPickWildDirection && onCancelWildPlay ? (
+                  <WildDirectionPicker
+                    size="md"
+                    onPickAsc={() => onPickWildDirection('asc')}
+                    onPickDesc={() => onPickWildDirection('desc')}
+                    onCancel={onCancelWildPlay}
+                  />
+                ) : (
+                  <Card
+                    card={top}
+                    size="md"
+                    stacked={pile.cards.length}
+                    onClick={() => onClickBuildPile(i)}
+                  />
+                )}
+                <span className="text-[9px] text-white/70 whitespace-nowrap">
+                  {isPendingWild ? 'pick' : sub}
+                </span>
               </DroppableZone>
             );
           })}
