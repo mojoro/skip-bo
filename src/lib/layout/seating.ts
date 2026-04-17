@@ -17,7 +17,7 @@ export interface SeatPosition {
 const LAYOUTS: Record<number, SeatPosition[]> = {
   2: [
     { xPct: 50, yPct: 88, side: 'bottom' },
-    { xPct: 50, yPct: 12, side: 'top' },
+    { xPct: 50, yPct: 18, side: 'top' },
   ],
   3: [
     { xPct: 50, yPct: 88, side: 'bottom' },
@@ -27,21 +27,21 @@ const LAYOUTS: Record<number, SeatPosition[]> = {
   4: [
     { xPct: 50, yPct: 88, side: 'bottom' },
     { xPct: 12, yPct: 50, side: 'left' },
-    { xPct: 50, yPct: 12, side: 'top' },
+    { xPct: 50, yPct: 18, side: 'top' },
     { xPct: 88, yPct: 50, side: 'right' },
   ],
   5: [
     { xPct: 50, yPct: 88, side: 'bottom' },
     { xPct: 12, yPct: 65, side: 'left' },
-    { xPct: 25, yPct: 15, side: 'top' },
-    { xPct: 75, yPct: 15, side: 'top' },
+    { xPct: 25, yPct: 18, side: 'top' },
+    { xPct: 75, yPct: 18, side: 'top' },
     { xPct: 88, yPct: 65, side: 'right' },
   ],
   6: [
     { xPct: 50, yPct: 88, side: 'bottom' },
     { xPct: 12, yPct: 70, side: 'left' },
     { xPct: 12, yPct: 30, side: 'left' },
-    { xPct: 50, yPct: 12, side: 'top' },
+    { xPct: 50, yPct: 18, side: 'top' },
     { xPct: 88, yPct: 30, side: 'right' },
     { xPct: 88, yPct: 70, side: 'right' },
   ],
@@ -58,9 +58,9 @@ const LAYOUTS: Record<number, SeatPosition[]> = {
     { xPct: 50, yPct: 90, side: 'bottom' },
     { xPct: 15, yPct: 82, side: 'bottom' },
     { xPct: 8, yPct: 50, side: 'left' },
-    { xPct: 20, yPct: 14, side: 'top' },
+    { xPct: 20, yPct: 18, side: 'top' },
     { xPct: 50, yPct: 10, side: 'top' },
-    { xPct: 80, yPct: 14, side: 'top' },
+    { xPct: 80, yPct: 18, side: 'top' },
     { xPct: 92, yPct: 50, side: 'right' },
     { xPct: 85, yPct: 82, side: 'bottom' },
   ],
