@@ -1,6 +1,7 @@
 'use client';
 
 import Card from '@/components/Card';
+import DraggableCard from '@/components/DraggableCard';
 import { Card as CardType, PlayerState } from '@/lib/game/types';
 import { SeatPosition } from '@/lib/layout/seating';
 
@@ -13,6 +14,7 @@ export type SeatSelection =
 interface SeatProps {
   position: SeatPosition;
   player: PlayerState;
+  playerIndex: number;
   isActive: boolean;
   isYou: boolean; // full hand visible vs face-down
   teamIndex: number | null;
@@ -28,6 +30,7 @@ interface SeatProps {
 export default function Seat({
   position,
   player,
+  playerIndex,
   isActive,
   isYou,
   teamIndex,
@@ -130,8 +133,11 @@ export default function Seat({
                 )}
                 {player.hand.map((c, i) =>
                   isYou ? (
-                    <Card
+                    <DraggableCard
                       key={c.id}
+                      id={`hand-${playerIndex}-${i}`}
+                      data={{ source: { from: 'hand', index: i } }}
+                      disabled={!isActive}
                       card={c}
                       size={cardSize}
                       highlighted={

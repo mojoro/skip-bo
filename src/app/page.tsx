@@ -293,6 +293,7 @@ export default function Home() {
               key={p.id}
               position={position}
               player={p}
+              playerIndex={i}
               isActive={isActive}
               isYou={isYou}
               teamIndex={teamIndex}
