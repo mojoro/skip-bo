@@ -8,7 +8,7 @@ Repo: https://github.com/mojoro/skip-bo
 
 ## 🔖 Where we left off
 
-We are mid-`superpowers:brainstorming`. Sections 1-3 approved and partially implemented. **Next is Section 4: Room Manager & Lobby.** Pick up by reading `docs/design-session-progress.md` (Resume instructions at the top), invoking the `superpowers:brainstorming` skill, and starting Section 4. Don't re-discuss solved sections.
+Section 4 (Room Manager & Lobby) brainstormed + approved. Spec: `docs/superpowers/specs/2026-04-17-room-manager-lobby-design.md`. Next step is `superpowers:writing-plans` to turn that spec into an implementation plan, then execute. Section 5 (AI bots) still needs a brainstorm pass after. Pick up by reading `docs/design-session-progress.md`.
 
 ## Status snapshot
 
