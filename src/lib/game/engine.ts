@@ -3,6 +3,7 @@ import {
   BuildDirection,
   BuildPile,
   Card,
+  CardSource,
   CONFIG_LIMITS,
   DISCARD_PILE_COUNT,
   GameConfig,
@@ -221,4 +222,65 @@ function maybeCompletePile(state: GameState, buildPileIndex: number): void {
     state.completedBuildPiles.push(...pile.cards);
     state.buildPiles[buildPileIndex] = { cards: [], direction: null };
   }
+}
+
+type ResolvedSource =
+  | { ok: true; card: Card; remove: () => void }
+  | { ok: false; error: string };
+
+function resolveSource(
+  state: GameState,
+  actorIndex: number,
+  source: CardSource,
+): ResolvedSource {
+  const actor = state.players[actorIndex];
+  const partnership = state.config.partnership;
+
+  if (source.from === 'hand') {
+    if (source.index < 0 || source.index >= actor.hand.length) {
+      return { ok: false, error: 'invalid hand index' };
+    }
+    const card = actor.hand[source.index];
+    return { ok: true, card, remove: () => actor.hand.splice(source.index, 1) };
+  }
+
+  if (source.from === 'stock') {
+    const ownerIdx = source.playerIndex;
+    if (ownerIdx < 0 || ownerIdx >= state.players.length) {
+      return { ok: false, error: 'invalid stock owner' };
+    }
+    const owner = state.players[ownerIdx];
+    if (owner.stockPile.length === 0) return { ok: false, error: 'stock pile empty' };
+    if (ownerIdx !== actorIndex) {
+      if (!partnership?.allowPlayFromPartnerStock) {
+        return { ok: false, error: 'playing from partner stock not allowed' };
+      }
+      if (!playersOnSameTeam(state, actorIndex, ownerIdx)) {
+        return { ok: false, error: 'not on same team' };
+      }
+    }
+    const card = owner.stockPile[owner.stockPile.length - 1];
+    return { ok: true, card, remove: () => owner.stockPile.pop() };
+  }
+
+  const ownerIdx = source.playerIndex;
+  if (ownerIdx < 0 || ownerIdx >= state.players.length) {
+    return { ok: false, error: 'invalid discard owner' };
+  }
+  if (source.pileIndex < 0 || source.pileIndex >= DISCARD_PILE_COUNT) {
+    return { ok: false, error: 'invalid discard pile index' };
+  }
+  const owner = state.players[ownerIdx];
+  const pile = owner.discardPiles[source.pileIndex];
+  if (pile.length === 0) return { ok: false, error: 'discard pile empty' };
+  if (ownerIdx !== actorIndex) {
+    if (!partnership?.allowPlayFromPartnerDiscard) {
+      return { ok: false, error: 'playing from partner discard not allowed' };
+    }
+    if (!playersOnSameTeam(state, actorIndex, ownerIdx)) {
+      return { ok: false, error: 'not on same team' };
+    }
+  }
+  const card = pile[pile.length - 1];
+  return { ok: true, card, remove: () => pile.pop() };
 }
