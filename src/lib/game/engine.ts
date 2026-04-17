@@ -8,6 +8,7 @@ import {
   GameState,
   PlayerState,
   Ruleset,
+  WILD,
   defaultConfigForRuleset,
 } from './types';
 import { createShuffledDeck } from './deck';
@@ -57,6 +58,9 @@ export function createGame(input: CreateGameInput): GameState {
     direction: null,
   }));
 
+  const currentPlayerIndex =
+    config.ruleset === 'official' ? 0 : pickStartingPlayerIndex(players, rng);
+
   return {
     config,
     phase: 'playing',
@@ -65,10 +69,30 @@ export function createGame(input: CreateGameInput): GameState {
     completedBuildPiles: [],
     buildPiles,
     players,
-    currentPlayerIndex: 0,
+    currentPlayerIndex,
     winningTeamIndex: null,
     stateVersion: 0,
   };
+}
+
+function pickStartingPlayerIndex(players: PlayerState[], rng: () => number): number {
+  const stockValue = (p: PlayerState): number => {
+    const top = p.stockPile[p.stockPile.length - 1];
+    if (!top) return -1;
+    return top.value === WILD ? 13 : top.value;
+  };
+  let bestValue = -1;
+  let tied: number[] = [];
+  for (let i = 0; i < players.length; i++) {
+    const v = stockValue(players[i]);
+    if (v > bestValue) {
+      bestValue = v;
+      tied = [i];
+    } else if (v === bestValue) {
+      tied.push(i);
+    }
+  }
+  return tied[Math.floor(rng() * tied.length)];
 }
 
 function validateConfig(config: GameConfig): void {
