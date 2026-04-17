@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import { DragDropProvider, DragSourceData, DropTargetData } from '@/lib/dnd';
 import NewGameModal, {
   NewGameSettings,
   buildPartnershipFromSettings,
@@ -180,6 +181,26 @@ export default function Home() {
     tryDiscard(selection.index, pileIndex, activeIdx);
   };
 
+  const onDragEnd = useCallback(
+    (source: DragSourceData, target: DropTargetData | null) => {
+      if (!target) return;
+      if (target.kind === 'build') {
+        tryPlayToBuild(source.source, target.index);
+        return;
+      }
+      if (target.kind === 'discard') {
+        if (source.source.from !== 'hand') {
+          setMessage('only hand cards can be discarded');
+          return;
+        }
+        tryDiscard(source.source.index, target.index, activeIdx);
+      }
+    },
+    // tryPlayToBuild/tryDiscard are redeclared each render but closure over latest state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeIdx, state],
+  );
+
 
   const confirmPendingDiscard = () => {
     if (!pendingDiscard) return;
@@ -195,6 +216,7 @@ export default function Home() {
   const partnershipActive = !!state.config.partnership?.enabled;
 
   return (
+    <DragDropProvider onDragEnd={onDragEnd}>
     <div className="wood-frame min-h-screen p-2 sm:p-3">
       <div className="felt-surface relative rounded-xl overflow-hidden h-[calc(100vh-24px)] sm:h-[calc(100vh-32px)]">
         {/* Header chrome */}
@@ -337,5 +359,6 @@ export default function Home() {
         onCancel={() => setPendingDiscard(null)}
       />
     </div>
+    </DragDropProvider>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { DropTargetData } from '@/lib/dnd';
+import { useDroppable, DropTargetData } from '@/lib/dnd';
 
 interface DroppableZoneProps {
   id: string;
@@ -12,11 +12,19 @@ interface DroppableZoneProps {
 }
 
 export default function DroppableZone({
-  id: _id,
-  data: _data,
-  disabled: _disabled,
+  id,
+  data,
+  disabled,
   className,
   children,
 }: DroppableZoneProps) {
-  return <div className={className}>{children}</div>;
+  const { ref, isOver } = useDroppable({ id, data, disabled });
+  const hoverRing = isOver
+    ? 'outline outline-2 outline-[var(--gold)] outline-offset-2 rounded-md'
+    : '';
+  return (
+    <div ref={ref} className={`${className ?? ''} ${hoverRing}`}>
+      {children}
+    </div>
+  );
 }
