@@ -83,6 +83,120 @@ export class RoomManager {
     return this.sessionIndex.get(sessionId);
   }
 
+  addMember(
+    roomId: string,
+    input: { sessionId: string; playerName: string },
+  ): { slotIndex: number } {
+    const room = this.requireRoom(roomId);
+    if (room.phase !== 'waiting') {
+      throw new RoomError('started', 'Room has already started.');
+    }
+    if (room.kickedSessionIds.has(input.sessionId)) {
+      throw new RoomError('kicked', 'Session was kicked from this room.');
+    }
+    if (this.sessionIndex.has(input.sessionId)) {
+      throw new RoomError('sessionAlreadySeated', `Session ${input.sessionId} is already seated in a room.`);
+    }
+    const slotIndex = room.slots.findIndex((s) => s.kind === 'open');
+    if (slotIndex < 0) {
+      throw new RoomError('full', 'Room is full.');
+    }
+    room.slots[slotIndex] = {
+      kind: 'human',
+      sessionId: input.sessionId,
+      name: input.playerName,
+      connected: true,
+      joinedAt: Date.now(),
+    };
+    this.sessionIndex.set(input.sessionId, room.id);
+    this.touch(room);
+    this.emitRoomUpdated(room);
+    return { slotIndex };
+  }
+
+  removeMember(
+    roomId: string,
+    targetSessionId: string,
+    opts: { actorSessionId: string },
+  ): void {
+    const room = this.requireRoom(roomId);
+    const selfLeave = opts.actorSessionId === targetSessionId;
+    const isHost = opts.actorSessionId === room.hostSessionId;
+    if (!selfLeave && !isHost) {
+      throw new RoomError('forbidden', 'Only the target or the host may remove a member.');
+    }
+    const idx = room.slots.findIndex(
+      (s) => s.kind === 'human' && s.sessionId === targetSessionId,
+    );
+    if (idx < 0) return;
+    room.slots[idx] = { kind: 'open' };
+    this.sessionIndex.delete(targetSessionId);
+    if (!selfLeave) {
+      room.kickedSessionIds.add(targetSessionId);
+    }
+    this.touch(room);
+    this.emitRoomUpdated(room);
+  }
+
+  setSlot(
+    roomId: string,
+    index: number,
+    desired: { kind: 'open' | 'locked' } | { kind: 'ai'; difficulty: 'easy' },
+    opts: { actorSessionId: string },
+  ): void {
+    const room = this.requireRoom(roomId);
+    if (opts.actorSessionId !== room.hostSessionId) {
+      throw new RoomError('forbidden', 'Only the host may set slots.');
+    }
+    if (room.phase !== 'waiting') {
+      throw new RoomError('phase', 'Slots are immutable after the game starts.');
+    }
+    if (index < 0 || index >= room.slots.length) {
+      throw new RoomError('badIndex', 'Slot index out of range.');
+    }
+    const current = room.slots[index];
+    if (!current) {
+      throw new RoomError('badIndex', 'Slot index out of range.');
+    }
+    if (current.kind === 'human' && current.sessionId === room.hostSessionId) {
+      throw new RoomError('selfKick', 'Host cannot self-kick.');
+    }
+    if (current.kind === 'human' && desired.kind === 'open') {
+      room.kickedSessionIds.add(current.sessionId);
+      this.sessionIndex.delete(current.sessionId);
+    }
+    if (desired.kind === 'ai') {
+      room.slots[index] = {
+        kind: 'ai',
+        botId: `bot-${randomUUID().slice(0, 8)}`,
+        difficulty: desired.difficulty,
+      };
+    } else {
+      room.slots[index] = { kind: desired.kind };
+    }
+    this.touch(room);
+    this.emitRoomUpdated(room);
+  }
+
+  private requireRoom(roomId: string): Room {
+    const room = this.rooms.get(roomId);
+    if (!room) throw new RoomError('notFound', `Room ${roomId} not found.`);
+    return room;
+  }
+
+  private touch(room: Room): void {
+    room.lastActivityAt = Date.now();
+  }
+
+  private emitRoomUpdated(room: Room): void {
+    if (room.phase === 'waiting' && room.visibility === 'public') {
+      this.events.emit('roomUpdated', {
+        type: 'roomUpdated',
+        room: projectRoomInfo(room, { context: 'list' }),
+      });
+    }
+  }
+
   private allocateCode(): string {
     for (let attempt = 0; attempt < 10; attempt++) {
       const code = generateRoomCode();
