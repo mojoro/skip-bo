@@ -110,7 +110,7 @@ export class RoomManager {
       kind: 'human',
       sessionId: input.sessionId,
       name: input.playerName,
-      connected: true,
+      connected: false,
       joinedAt: Date.now(),
     };
     this.sessionIndex.set(input.sessionId, room.id);
@@ -231,6 +231,23 @@ export class RoomManager {
     this.emitRoomRemoved(room);
   }
 
+  stats(): { gamesInProgress: number; playersOnline: number } {
+    let games = 0;
+    const sessions = new Set<string>();
+    for (const room of this.rooms.values()) {
+      if (room.phase === 'playing') games++;
+      for (const slot of room.slots) {
+        if (slot.kind === 'human' && slot.connected) sessions.add(slot.sessionId);
+      }
+    }
+    return { gamesInProgress: games, playersOnline: sessions.size };
+  }
+
+  markUpdated(room: Room): void {
+    this.touch(room);
+    this.emitRoomUpdated(room);
+  }
+
   private scheduleIdle(room: Room): void {
     if (room.phase !== 'waiting') return;
     this.clearIdleTimer(room);
@@ -308,7 +325,7 @@ export class RoomManager {
       kind: 'human',
       sessionId: input.sessionId,
       name: input.playerName,
-      connected: true,
+      connected: false,
       joinedAt: Date.now(),
     };
     return slots;

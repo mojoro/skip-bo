@@ -7,6 +7,7 @@ import { handleUnknown, writeProblem } from './middleware/errorHandler';
 import { problemResponse } from '../problemJson';
 import { Router } from './router';
 import type { RoomManager } from '../room/manager';
+import { postRoom, listRooms, getRoom, patchRoom } from './handlers/rooms';
 
 export interface BuildOptions {
   roomManager: RoomManager;
@@ -49,4 +50,11 @@ export function buildHttpServer(opts: BuildOptions): BuiltServer {
   }
 
   return { httpServer, router };
+}
+
+export function mountRoutes(router: Router, mgr: RoomManager): void {
+  router.add('GET', '/v1/rooms', listRooms(mgr));
+  router.add('POST', '/v1/rooms', postRoom(mgr));
+  router.add('GET', '/v1/rooms/:id', getRoom(mgr));
+  router.add('PATCH', '/v1/rooms/:id', patchRoom(mgr));
 }

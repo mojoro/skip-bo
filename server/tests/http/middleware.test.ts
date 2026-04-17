@@ -19,8 +19,19 @@ describe('http middleware', () => {
     httpServer.close();
   });
 
-  it.skip('returns 401 when Authorization header missing on protected route', async () => {
-    // re-enable after Task 12 mounts handlers
+  it('returns 401 when Authorization header missing on protected route', async () => {
+    const { buildHttpServer: build, mountRoutes: mount } = await import('../../src/http/server');
+    const mgr = new RoomManager();
+    const { httpServer, router } = build({ roomManager: mgr, corsOrigin: '*' });
+    mount(router, mgr);
+    await new Promise<void>((r) => httpServer.listen(0, r));
+    const { port } = httpServer.address() as AddressInfo;
+    const res = await fetch(`http://127.0.0.1:${port}/v1/rooms`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+    });
+    expect(res.status).toBe(401);
+    expect(res.headers.get('content-type')).toBe('application/problem+json');
+    httpServer.close();
   });
 
   it('returns 400 when body is invalid JSON', async () => {
