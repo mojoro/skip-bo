@@ -1,6 +1,7 @@
 'use client';
 
 import Card from '@/components/Card';
+import DroppableZone from '@/components/DroppableZone';
 import { BuildPile, GameConfig } from '@/lib/game/types';
 
 interface TableCenterProps {
@@ -51,7 +52,12 @@ export default function TableCenter({
               ? emptyLabel
               : `${pile.direction?.toUpperCase()} · ${pile.cards.length}/12`;
             return (
-              <div key={i} className="flex flex-col items-center gap-1">
+              <DroppableZone
+                key={i}
+                id={`build-${i}`}
+                data={{ kind: 'build', index: i }}
+                className="flex flex-col items-center gap-1"
+              >
                 <Card
                   card={top}
                   size="lg"
@@ -62,7 +68,7 @@ export default function TableCenter({
                 <span className="text-[10px] text-white/75 tracking-wider">
                   {sub}
                 </span>
-              </div>
+              </DroppableZone>
             );
           })}
         </div>
