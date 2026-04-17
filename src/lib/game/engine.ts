@@ -225,6 +225,12 @@ function maybeCompletePile(state: GameState, buildPileIndex: number): void {
   }
 }
 
+function advanceTurn(state: GameState, rng: () => number): void {
+  state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
+  state.turnPhase = 'play';
+  refillHand(state, state.currentPlayerIndex, rng);
+}
+
 type ResolvedSource =
   | { ok: true; card: Card; remove: () => void }
   | { ok: false; error: string };
@@ -317,6 +323,35 @@ export function applyAction(
       refillHand(next, actorIndex, rng);
     }
 
+    next.stateVersion += 1;
+    return { ok: true, state: next };
+  }
+
+  if (action.type === 'DISCARD') {
+    const actor = next.players[actorIndex];
+    if (action.handIndex < 0 || action.handIndex >= actor.hand.length) {
+      return { ok: false, error: 'invalid hand index' };
+    }
+    if (action.discardPileIndex < 0 || action.discardPileIndex >= DISCARD_PILE_COUNT) {
+      return { ok: false, error: 'invalid discard pile index' };
+    }
+    const targetIdx = action.targetPlayerIndex;
+    if (targetIdx < 0 || targetIdx >= next.players.length) {
+      return { ok: false, error: 'invalid target player' };
+    }
+    if (targetIdx !== actorIndex) {
+      const partnership = next.config.partnership;
+      if (!partnership?.allowDiscardToPartnerDiscard) {
+        return { ok: false, error: 'cannot discard to partner pile in this ruleset' };
+      }
+      if (!playersOnSameTeam(next, actorIndex, targetIdx)) {
+        return { ok: false, error: 'target not on same team' };
+      }
+    }
+    const [card] = actor.hand.splice(action.handIndex, 1);
+    next.players[targetIdx].discardPiles[action.discardPileIndex].push(card);
+
+    advanceTurn(next, rng);
     next.stateVersion += 1;
     return { ok: true, state: next };
   }
