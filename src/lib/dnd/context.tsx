@@ -96,9 +96,26 @@ export function DragDropProvider({ onDragEnd, children }: DragDropProviderProps)
       const hit = hitTestTargets(targetsRef.current, e.clientX, e.clientY);
       setHoveredTargetId((prev) => (prev === hit ? prev : hit));
     };
+    const onUp = (e: PointerEvent) => {
+      if (e.pointerId !== drag.pointerId) return;
+      endDragRef.current('drop');
+    };
+    const onCancel = (e: PointerEvent) => {
+      if (e.pointerId !== drag.pointerId) return;
+      endDragRef.current('cancel');
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') endDragRef.current('cancel');
+    };
     window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
+    window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('keydown', onKey);
     };
   }, [drag]);
 
@@ -135,6 +152,9 @@ export function DragDropProvider({ onDragEnd, children }: DragDropProviderProps)
     });
     setHoveredTargetId(null);
   }, [hoveredTargetId]);
+
+  const endDragRef = useRef(endDrag);
+  endDragRef.current = endDrag;
 
   const value = useMemo<DragDropContextValue>(
     () => ({
