@@ -13,6 +13,7 @@ export class RingBuffer<T> {
   }
 
   since(lastId: number): RingEntry<T>[] | null {
+    if (lastId >= this.nextId) return null;
     if (this.entries.length === 0) return [];
     const oldest = this.entries[0]!.id;
     if (lastId < oldest) return null;

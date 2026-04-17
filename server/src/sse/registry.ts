@@ -17,7 +17,7 @@ export class LobbyStreamRegistry {
 
   publish(event: LobbyEvent): RingEntry<LobbyEvent> {
     const entry = this.buffer.push(event);
-    for (const [, w] of this.subscribers) {
+    for (const w of [...this.subscribers.values()]) {
       if (w.closed) continue;
       w.sendEvent(event.type, event, entry.id);
     }

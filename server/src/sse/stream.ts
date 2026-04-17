@@ -17,12 +17,14 @@ export function openSseStream(res: ServerResponse): SseWriter {
   res.flushHeaders?.();
   let closed = false;
   const closeListeners: Array<() => void> = [];
-  const onEnd = () => {
+  const runCloseListeners = () => {
+    if (closed) return;
     closed = true;
     for (const cb of closeListeners) cb();
   };
-  res.on('close', onEnd);
-  res.on('finish', onEnd);
+  res.on('close', runCloseListeners);
+  res.on('finish', runCloseListeners);
+  res.on('error', runCloseListeners);
   return {
     get closed() { return closed; },
     sendEvent(name, data, id) {
@@ -39,7 +41,7 @@ export function openSseStream(res: ServerResponse): SseWriter {
     },
     close() {
       if (closed) return;
-      closed = true;
+      runCloseListeners();
       res.end();
     },
     onClose(cb) {

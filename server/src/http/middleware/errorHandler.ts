@@ -9,6 +9,7 @@ export function writeProblem(res: ServerResponse, resp: ProblemResponse): void {
 }
 
 export function handleUnknown(res: ServerResponse, err: unknown, instance: string): void {
+  if (res.headersSent) { res.end(); return; }
   if (err instanceof BodyError) {
     writeProblem(res, problemResponse({
       type: 'https://skip-bo.example.com/problems/' + (err.kind === 'tooLarge' ? 'payload-too-large' : 'bad-json'),

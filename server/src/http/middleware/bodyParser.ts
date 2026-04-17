@@ -11,7 +11,10 @@ export async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   for await (const chunk of req) {
     const buf = chunk as Buffer;
     total += buf.length;
-    if (total > config.maxBodyBytes) throw new BodyError('tooLarge');
+    if (total > config.maxBodyBytes) {
+      req.destroy();
+      throw new BodyError('tooLarge');
+    }
     chunks.push(buf);
   }
   if (total === 0) return {};

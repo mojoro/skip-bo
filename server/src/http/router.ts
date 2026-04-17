@@ -18,12 +18,16 @@ export class Router {
 
   add(method: string, path: string, handler: RouteHandler): void {
     const keys: string[] = [];
+    const escapeLiteral = (seg: string) => seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const pattern = new RegExp(
       '^' +
-        path.replace(/:([A-Za-z0-9_]+)/g, (_m, key: string) => {
-          keys.push(key);
-          return '([^/]+)';
-        }) +
+        path.split(/(:[A-Za-z0-9_]+)/).map((seg, i) => {
+          if (i % 2 === 1) {
+            keys.push(seg.slice(1));
+            return '([^/]+)';
+          }
+          return escapeLiteral(seg);
+        }).join('') +
         '/?$',
     );
     this.routes.push({ method: method.toUpperCase(), pattern, keys, handler });
