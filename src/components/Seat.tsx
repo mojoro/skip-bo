@@ -100,7 +100,7 @@ export default function Seat({
           </div>
 
           {/* Row: stock | hand | discard piles */}
-          <div className="flex items-end gap-4">
+          <div className="flex items-end gap-2 sm:gap-4 flex-wrap sm:flex-nowrap">
             {/* Stock pile */}
             <div className="flex flex-col items-center gap-1">
               {stockTop ? (
@@ -123,8 +123,8 @@ export default function Seat({
             </div>
 
             {/* Hand — fanned */}
-            <div className="flex flex-col items-center gap-1">
-              <div className="flex gap-1">
+            <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
+              <div className="flex gap-1 overflow-x-auto max-w-full pb-1">
                 {player.hand.length === 0 && (
                   <div className="text-xs text-white/40 italic px-4">empty hand</div>
                 )}
