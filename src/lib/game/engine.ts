@@ -110,3 +110,42 @@ function validateConfig(config: GameConfig): void {
     throw new Error(`maxPlayers out of range`);
   }
 }
+
+function cloneState(state: GameState): GameState {
+  return {
+    config: state.config,
+    phase: state.phase,
+    turnPhase: state.turnPhase,
+    drawPile: [...state.drawPile],
+    completedBuildPiles: [...state.completedBuildPiles],
+    buildPiles: state.buildPiles.map((b) => ({ cards: [...b.cards], direction: b.direction })),
+    players: state.players.map((p) => ({
+      id: p.id,
+      name: p.name,
+      stockPile: [...p.stockPile],
+      hand: [...p.hand],
+      discardPiles: p.discardPiles.map((d) => [...d]),
+    })),
+    currentPlayerIndex: state.currentPlayerIndex,
+    winningTeamIndex: state.winningTeamIndex,
+    stateVersion: state.stateVersion,
+  };
+}
+
+function teamIndexOfPlayer(state: GameState, playerId: string): number | null {
+  const teams = state.config.partnership?.teams;
+  if (!teams) return null;
+  for (let i = 0; i < teams.length; i++) {
+    if (teams[i].includes(playerId)) return i;
+  }
+  return null;
+}
+
+function playersOnSameTeam(state: GameState, aIdx: number, bIdx: number): boolean {
+  if (aIdx === bIdx) return true;
+  const pa = state.players[aIdx];
+  const pb = state.players[bIdx];
+  const ta = teamIndexOfPlayer(state, pa.id);
+  const tb = teamIndexOfPlayer(state, pb.id);
+  return ta !== null && tb !== null && ta === tb;
+}
