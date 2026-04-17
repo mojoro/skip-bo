@@ -6,6 +6,7 @@ import {
   CardSource,
   CONFIG_LIMITS,
   DISCARD_PILE_COUNT,
+  GameAction,
   GameConfig,
   GameState,
   PlayerState,
@@ -283,4 +284,42 @@ function resolveSource(
   }
   const card = pile[pile.length - 1];
   return { ok: true, card, remove: () => pile.pop() };
+}
+
+export function applyAction(
+  state: GameState,
+  action: GameAction,
+): { ok: true; state: GameState } | { ok: false; error: string } {
+  if (state.phase !== 'playing') {
+    return { ok: false, error: 'game is not in playing phase' };
+  }
+  const next = cloneState(state);
+  const actorIndex = next.currentPlayerIndex;
+  const rng = mulberry32((next.config.seed ?? 0) + next.stateVersion + 1);
+
+  if (action.type === 'PLAY_TO_BUILD') {
+    if (action.buildPileIndex < 0 || action.buildPileIndex >= BUILD_PILE_COUNT) {
+      return { ok: false, error: 'invalid build pile index' };
+    }
+    const source = resolveSource(next, actorIndex, action.source);
+    if (!source.ok) return { ok: false, error: source.error };
+
+    const pile = next.buildPiles[action.buildPileIndex];
+    const check = canPlayCardOnPile(pile, source.card, next.config, action.declaredDirection);
+    if (!check.ok) return { ok: false, error: check.error };
+
+    source.remove();
+    pile.cards.push(source.card);
+    pile.direction = check.resolvedDirection;
+    maybeCompletePile(next, action.buildPileIndex);
+
+    if (next.players[actorIndex].hand.length === 0) {
+      refillHand(next, actorIndex, rng);
+    }
+
+    next.stateVersion += 1;
+    return { ok: true, state: next };
+  }
+
+  return { ok: false, error: 'unknown action type' };
 }
