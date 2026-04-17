@@ -231,6 +231,31 @@ function advanceTurn(state: GameState, rng: () => number): void {
   refillHand(state, state.currentPlayerIndex, rng);
 }
 
+function checkWin(state: GameState): void {
+  const partnership = state.config.partnership;
+  if (partnership && partnership.enabled) {
+    for (let t = 0; t < partnership.teams.length; t++) {
+      const allEmpty = partnership.teams[t].every((pid) => {
+        const p = state.players.find((pp) => pp.id === pid);
+        return !!p && p.stockPile.length === 0;
+      });
+      if (allEmpty) {
+        state.phase = 'finished';
+        state.winningTeamIndex = t;
+        return;
+      }
+    }
+    return;
+  }
+  for (let i = 0; i < state.players.length; i++) {
+    if (state.players[i].stockPile.length === 0) {
+      state.phase = 'finished';
+      state.winningTeamIndex = i;
+      return;
+    }
+  }
+}
+
 type ResolvedSource =
   | { ok: true; card: Card; remove: () => void }
   | { ok: false; error: string };
@@ -323,6 +348,7 @@ export function applyAction(
       refillHand(next, actorIndex, rng);
     }
 
+    checkWin(next);
     next.stateVersion += 1;
     return { ok: true, state: next };
   }
@@ -351,7 +377,8 @@ export function applyAction(
     const [card] = actor.hand.splice(action.handIndex, 1);
     next.players[targetIdx].discardPiles[action.discardPileIndex].push(card);
 
-    advanceTurn(next, rng);
+    checkWin(next);
+    if (next.phase === 'playing') advanceTurn(next, rng);
     next.stateVersion += 1;
     return { ok: true, state: next };
   }
