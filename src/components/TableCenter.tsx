@@ -23,7 +23,7 @@ export default function TableCenter({
 
   return (
     <div
-      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl px-8 py-6 table-inset"
+      className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 mx-auto w-fit rounded-2xl px-4 py-4 sm:px-8 sm:py-6 table-inset"
       style={{
         background:
           'radial-gradient(circle at 50% 35%, rgba(255,255,255,0.08), rgba(0,0,0,0.25))',
@@ -31,7 +31,7 @@ export default function TableCenter({
           'inset 0 0 40px rgba(0,0,0,0.6), 0 10px 30px rgba(0,0,0,0.45)',
       }}
     >
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-2 sm:gap-6 flex-wrap justify-center">
         {/* Draw pile */}
         <div className="flex flex-col items-center gap-1">
           {drawPileCount > 0 ? (
