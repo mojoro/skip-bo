@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { DragDropProvider } from '@dnd-kit/react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import NewGameModal, {
   NewGameSettings,
@@ -11,7 +12,7 @@ import RulesetInfo from '@/components/RulesetInfo';
 import Seat, { SeatSelection } from '@/components/Seat';
 import TableCenter from '@/components/TableCenter';
 import { applyAction, createGame } from '@/lib/game/engine';
-import { CardSource, GameAction, GameState, WILD } from '@/lib/game/types';
+import { Card, CardSource, GameAction, GameState, WILD } from '@/lib/game/types';
 import { getSeatPositions } from '@/lib/layout/seating';
 
 interface PendingDiscard {
@@ -20,6 +21,11 @@ interface PendingDiscard {
   targetPlayerIndex: number;
   cardLabel: string;
 }
+
+export type DragSourceData = { source: CardSource };
+export type DropTargetData =
+  | { kind: 'build'; index: number }
+  | { kind: 'discard'; index: number };
 
 const TEAM_COLORS = [
   '#eab308', // amber
@@ -122,16 +128,23 @@ export default function Home() {
     setNewGameOpen(false);
   };
 
-  const onClickBuildPile = (buildPileIndex: number) => {
-    const source = sourceFromSelection();
-    if (!source) {
-      setMessage('select a card first');
-      return;
+  const resolveCardForSource = (source: CardSource): Card | null => {
+    if (source.from === 'hand') return activePlayer.hand[source.index] ?? null;
+    if (source.from === 'stock') {
+      const p = state.players[source.playerIndex];
+      return p.stockPile[p.stockPile.length - 1] ?? null;
     }
+    const p = state.players[source.playerIndex];
+    const pile = p.discardPiles[source.pileIndex];
+    return pile[pile.length - 1] ?? null;
+  };
+
+  const tryPlayToBuild = (source: CardSource, buildPileIndex: number) => {
     const pile = state.buildPiles[buildPileIndex];
     const isEmpty = pile.cards.length === 0;
+    const card = resolveCardForSource(source);
     let declaredDirection: 'asc' | 'desc' | undefined;
-    if (isEmpty && state.config.bidirectionalBuild && selectedCard?.value === WILD) {
+    if (isEmpty && state.config.bidirectionalBuild && card?.value === WILD) {
       const goAsc = window.confirm(
         'Start ascending (from 1)?\nOK = ascending, Cancel = descending.',
       );
@@ -145,19 +158,50 @@ export default function Home() {
     });
   };
 
+  const tryDiscard = (handIndex: number, pileIndex: number, targetIdx: number) => {
+    const card = activePlayer.hand[handIndex];
+    if (!card) return;
+    setPendingDiscard({
+      handIndex,
+      discardPileIndex: pileIndex,
+      targetPlayerIndex: targetIdx,
+      cardLabel: card.value === WILD ? 'Skip-Bo (wild)' : String(card.value),
+    });
+  };
+
+  const onClickBuildPile = (buildPileIndex: number) => {
+    const source = sourceFromSelection();
+    if (!source) {
+      setMessage('select a card first');
+      return;
+    }
+    tryPlayToBuild(source, buildPileIndex);
+  };
+
   const onClickOwnDiscardPile = (pileIndex: number) => {
     if (selection.kind !== 'hand') {
       setMessage('select a hand card to discard');
       return;
     }
-    const card = activePlayer.hand[selection.index];
-    if (!card) return;
-    setPendingDiscard({
-      handIndex: selection.index,
-      discardPileIndex: pileIndex,
-      targetPlayerIndex: activeIdx,
-      cardLabel: card.value === WILD ? 'Skip-Bo (wild)' : String(card.value),
-    });
+    tryDiscard(selection.index, pileIndex, activeIdx);
+  };
+
+  const onDragEnd = (event: { canceled: boolean; operation: { source: { data: unknown } | null; target: { data: unknown } | null } }) => {
+    if (event.canceled) return;
+    const src = event.operation.source?.data as DragSourceData | undefined;
+    const tgt = event.operation.target?.data as DropTargetData | undefined;
+    if (!src || !tgt) return;
+    if (tgt.kind === 'build') {
+      tryPlayToBuild(src.source, tgt.index);
+      return;
+    }
+    if (tgt.kind === 'discard') {
+      if (src.source.from !== 'hand') {
+        setMessage('only hand cards can be discarded');
+        return;
+      }
+      tryDiscard(src.source.index, tgt.index, activeIdx);
+    }
   };
 
   const confirmPendingDiscard = () => {
@@ -174,6 +218,7 @@ export default function Home() {
   const partnershipActive = !!state.config.partnership?.enabled;
 
   return (
+    <DragDropProvider onDragEnd={onDragEnd}>
     <div className="wood-frame min-h-screen p-2 sm:p-3">
       <div className="felt-surface relative rounded-xl overflow-hidden h-[calc(100vh-24px)] sm:h-[calc(100vh-32px)]">
         {/* Header chrome */}
@@ -315,5 +360,6 @@ export default function Home() {
         onCancel={() => setPendingDiscard(null)}
       />
     </div>
+    </DragDropProvider>
   );
 }
