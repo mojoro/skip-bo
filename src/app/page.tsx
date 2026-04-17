@@ -14,6 +14,7 @@ import TableCenter from '@/components/TableCenter';
 import { applyAction, createGame } from '@/lib/game/engine';
 import { Card, CardSource, GameAction, GameState, WILD } from '@/lib/game/types';
 import { getSeatPositions } from '@/lib/layout/seating';
+import { DragSourceData, DropTargetData } from '@/lib/dnd';
 
 interface PendingDiscard {
   handIndex: number;
@@ -21,11 +22,6 @@ interface PendingDiscard {
   targetPlayerIndex: number;
   cardLabel: string;
 }
-
-export type DragSourceData = { source: CardSource };
-export type DropTargetData =
-  | { kind: 'build'; index: number }
-  | { kind: 'discard'; index: number };
 
 const TEAM_COLORS = [
   '#eab308', // amber
