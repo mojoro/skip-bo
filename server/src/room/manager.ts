@@ -1,9 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { GameConfig } from '@engine/types';
-import type { Room, Visibility } from '../types';
+import type { Room, Visibility, FinishReason } from '../types';
 import { generateRoomCode, normalizeRoomCode } from './code';
 import { LobbyEventBus } from './events';
 import { projectRoomInfo } from './slots';
+import {
+  IDLE_MS, FINISH_CLEANUP_MS,
+  migrateHost, fillOpenWithAi, initializeGameState, markFinished,
+} from './lifecycle';
 
 export interface CreateRoomInput {
   sessionId: string;
@@ -61,6 +65,7 @@ export class RoomManager {
         room: projectRoomInfo(room, { context: 'list' }),
       });
     }
+    this.scheduleIdle(room);
     return { room };
   }
 
@@ -134,6 +139,20 @@ export class RoomManager {
     if (!selfLeave) {
       room.kickedSessionIds.add(targetSessionId);
     }
+    if (targetSessionId === room.hostSessionId) {
+      const result = migrateHost(room);
+      if (result === 'empty') {
+        if (room.phase === 'waiting') {
+          this.deleteRoom(room, { reason: 'empty' });
+          return;
+        }
+        // playing: grace-window handling is Section 3; stub by finishing immediately.
+        markFinished(room, 'abandoned');
+        this.scheduleCleanup(room);
+        this.emitRoomRemoved(room);
+        return;
+      }
+    }
     this.touch(room);
     this.emitRoomUpdated(room);
   }
@@ -178,6 +197,82 @@ export class RoomManager {
     this.emitRoomUpdated(room);
   }
 
+  startGame(roomId: string, opts: { actorSessionId: string }): void {
+    const room = this.requireRoom(roomId);
+    if (opts.actorSessionId !== room.hostSessionId) {
+      throw new RoomError('forbidden', 'Only the host may start the game.');
+    }
+    if (room.phase !== 'waiting') {
+      throw new RoomError('phase', 'Room has already started.');
+    }
+    const humans = room.slots.filter((s) => s.kind === 'human').length;
+    const open = room.slots.filter((s) => s.kind === 'open').length;
+    if (humans < 2 && !(room.allowAiFill && humans >= 1 && humans + open >= 2)) {
+      throw new RoomError('tooFew', 'tooFew: need at least two players.');
+    }
+    if (open > 0) {
+      if (!room.allowAiFill) {
+        throw new RoomError('openSlots', 'Open slots remain; enable AI fill or wait for players.');
+      }
+      fillOpenWithAi(room);
+    }
+    room.phase = 'playing';
+    room.game = initializeGameState(room);
+    this.touch(room);
+    this.clearIdleTimer(room);
+    this.emitRoomRemoved(room);
+  }
+
+  finishGame(roomId: string, reason: FinishReason): void {
+    const room = this.requireRoom(roomId);
+    if (room.phase !== 'playing') return;
+    markFinished(room, reason);
+    this.scheduleCleanup(room);
+    this.emitRoomRemoved(room);
+  }
+
+  private scheduleIdle(room: Room): void {
+    if (room.phase !== 'waiting') return;
+    this.clearIdleTimer(room);
+    room.idleTimer = setTimeout(() => {
+      this.deleteRoom(room, { reason: 'idle' });
+    }, IDLE_MS);
+  }
+
+  private clearIdleTimer(room: Room): void {
+    if (room.idleTimer) {
+      clearTimeout(room.idleTimer);
+      room.idleTimer = null;
+    }
+  }
+
+  private scheduleCleanup(room: Room): void {
+    if (room.cleanupTimer) clearTimeout(room.cleanupTimer);
+    room.cleanupTimer = setTimeout(() => {
+      this.deleteRoom(room, { reason: 'postGame' });
+    }, FINISH_CLEANUP_MS);
+  }
+
+  private deleteRoom(room: Room, _opts: { reason: 'idle' | 'postGame' | 'empty' }): void {
+    this.rooms.delete(room.id);
+    this.codeIndex.delete(room.code);
+    for (const slot of room.slots) {
+      if (slot.kind === 'human') this.sessionIndex.delete(slot.sessionId);
+    }
+    this.clearIdleTimer(room);
+    if (room.cleanupTimer) {
+      clearTimeout(room.cleanupTimer);
+      room.cleanupTimer = null;
+    }
+    this.emitRoomRemoved(room);
+  }
+
+  private emitRoomRemoved(room: Room): void {
+    if (room.visibility === 'public') {
+      this.events.emit('roomRemoved', { type: 'roomRemoved', roomId: room.id });
+    }
+  }
+
   private requireRoom(roomId: string): Room {
     const room = this.rooms.get(roomId);
     if (!room) throw new RoomError('notFound', `Room ${roomId} not found.`);
@@ -186,6 +281,7 @@ export class RoomManager {
 
   private touch(room: Room): void {
     room.lastActivityAt = Date.now();
+    this.scheduleIdle(room);
   }
 
   private emitRoomUpdated(room: Room): void {
