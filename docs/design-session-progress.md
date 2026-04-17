@@ -1,6 +1,27 @@
 # Skip-Bo Game — Design Session Progress
 
-> **Resume instructions:** This file captures a brainstorming session for a browser-based multiplayer Skip-Bo card game. The brainstorming skill (`superpowers:brainstorming`) is in progress. Sections 1-3 of the design have been approved by the user. Continue from **Section 4: Room Manager & Lobby** below. After all sections are approved, write the design doc to `docs/superpowers/specs/`, self-review, get user approval, then invoke the `superpowers:writing-plans` skill.
+> **Resume instructions (fresh Claude — read this first):**
+>
+> 1. Read `CLAUDE.md` in repo root for the full status snapshot.
+> 2. We are mid-`superpowers:brainstorming`. Sections 1, 2 (rewritten, see below), and 3 are approved. **Next up is Section 4: Room Manager & Lobby** — pick up with the brainstorming skill there.
+> 3. After all design sections are approved, write the final design doc to `docs/superpowers/specs/YYYY-MM-DD-networking-design.md`, self-review, get user approval, then invoke `superpowers:writing-plans`.
+> 4. Sections 1 and 3 have already been partially implemented as an offline hot-seat demo — see the "Implementation status since brainstorming started" section below so you don't re-discuss solved problems.
+>
+> **Don't re-brainstorm approved sections.** Just confirm which section we're on, ask clarifying questions for Section 4, and continue.
+
+## Implementation status since brainstorming started
+
+A full offline hot-seat demo was built between brainstorming Section 3 and returning to Section 4. Treat everything in this list as *done* and *reviewed by the user*; don't re-architect.
+
+- **Engine (Section 1)** — implemented as a pure TypeScript module in `src/lib/game/`. Deterministic mulberry32 shuffle. Ruleset enum `recommended` / `official`. Partnership mode with three permission flags. 60 Vitest tests covering deck, createGame, PLAY_TO_BUILD, DISCARD + turn advance, win condition (singles and partnerships), and PlayerView hiding.
+- **WebSocket protocol (Section 2 → rewrote as Section 3)** — design-only, **not yet implemented**. The rewrite added: HTTP Upgrade origin check (CSWSH), protocol-level `ws.ping()` heartbeat, close codes (1000/1008/1009/4001-4005), backpressure cap via `bufferedAmount`, 16 KB `maxPayload`, token-bucket rate limit, 60s disconnect grace window, duplicate-session kick (4004), state version numbers on broadcasts, exponential backoff + jitter reconnect. See the rewritten Section 3 further down in this file.
+- **Architecture (Section 3 original)** — two-service split (Vercel Next.js + AWS EC2 Node `ws` server) — approved, **server side not yet built**.
+- **UI (partial Section 6)** — built without a formal brainstorm. Desktop "tabletop" layout (green felt, wood frame, seats absolute-positioned around the center) for 2-4 players. Compact stacked layout (opponents scroll above, active zone pinned bottom) for mobile always and desktop when 5+ players. Mattel-style card palette. **When we reach Section 6, treat it as a write-up of the shipped UI, not a fresh design.**
+- **Drag and drop** — custom stack under `src/lib/dnd/`, no library. Pointer Events with movement threshold, imperative ghost transform, rect-based hit-test, Escape cancels. `DragDropProvider` + `useDraggable` + `useDroppable`. Inline `WildDirectionPicker` (replaces `window.confirm`).
+- **Modals** — `NewGameModal`, `RulesetInfo`, `ConfirmDialog` (end-turn confirm).
+- **Repo** — pushed to https://github.com/mojoro/skip-bo (public). `main` is the single branch; `demo-snapshot` preserved locally.
+
+**Still to build:** server, client WS hook, room manager + lobby (Section 4), AI bots (Section 5), AWS deploy (Section 7), testing strategy for the network layer (Section 8). UI polish list lives in `CLAUDE.md`.
 
 ## Project Context
 

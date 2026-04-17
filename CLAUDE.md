@@ -6,6 +6,10 @@ Browser-based multiplayer Skip-Bo card game. Part of John Moorman's "10 projects
 
 Repo: https://github.com/mojoro/skip-bo
 
+## 🔖 Where we left off
+
+We are mid-`superpowers:brainstorming`. Sections 1-3 approved and partially implemented. **Next is Section 4: Room Manager & Lobby.** Pick up by reading `docs/design-session-progress.md` (Resume instructions at the top), invoking the `superpowers:brainstorming` skill, and starting Section 4. Don't re-discuss solved sections.
+
 ## Status snapshot
 
 - **Engine (done):** pure TypeScript module under `src/lib/game/`. Deterministic mulberry32 shuffle, ruleset enum (recommended / official), partnership mode with 3 permission flags. 60 Vitest tests covering deck composition, createGame defaults, PLAY_TO_BUILD across sources and directions, DISCARD + turn advance, win condition for singles and partnerships, PlayerView visibility.
