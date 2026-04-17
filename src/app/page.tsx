@@ -23,6 +23,11 @@ interface PendingDiscard {
   cardLabel: string;
 }
 
+interface PendingWildPlay {
+  source: CardSource;
+  buildPileIndex: number;
+}
+
 const TEAM_COLORS = [
   '#eab308', // amber
   '#0ea5e9', // sky
@@ -87,6 +92,7 @@ function Board({ state, setState }: BoardProps) {
   const [newGameOpen, setNewGameOpen] = useState(false);
   const [rulesetOpen, setRulesetOpen] = useState(false);
   const [pendingDiscard, setPendingDiscard] = useState<PendingDiscard | null>(null);
+  const [pendingWildPlay, setPendingWildPlay] = useState<PendingWildPlay | null>(null);
 
   const players = state.players;
   const activeIdx = state.currentPlayerIndex;
@@ -171,20 +177,25 @@ function Board({ state, setState }: BoardProps) {
     const pile = state.buildPiles[buildPileIndex];
     const isEmpty = pile.cards.length === 0;
     const card = resolveCardForSource(source);
-    let declaredDirection: 'asc' | 'desc' | undefined;
     if (isEmpty && state.config.bidirectionalBuild && card?.value === WILD) {
-      const goAsc = window.confirm(
-        'Start ascending (from 1)?\nOK = ascending, Cancel = descending.',
-      );
-      declaredDirection = goAsc ? 'asc' : 'desc';
+      setPendingWildPlay({ source, buildPileIndex });
+      return;
     }
+    dispatch({ type: 'PLAY_TO_BUILD', source, buildPileIndex });
+  };
+
+  const resolvePendingWild = (direction: 'asc' | 'desc') => {
+    if (!pendingWildPlay) return;
     dispatch({
       type: 'PLAY_TO_BUILD',
-      source,
-      buildPileIndex,
-      declaredDirection,
+      source: pendingWildPlay.source,
+      buildPileIndex: pendingWildPlay.buildPileIndex,
+      declaredDirection: direction,
     });
+    setPendingWildPlay(null);
   };
+
+  const cancelPendingWild = () => setPendingWildPlay(null);
 
   const tryDiscard = (handIndex: number, pileIndex: number, targetIdx: number) => {
     const card = activePlayer.hand[handIndex];
@@ -344,6 +355,9 @@ function Board({ state, setState }: BoardProps) {
             completedPileCount={state.completedBuildPiles.length}
             config={state.config}
             onClickBuildPile={onClickBuildPile}
+            pendingWildBuildPileIndex={pendingWildPlay?.buildPileIndex ?? null}
+            onPickWildDirection={resolvePendingWild}
+            onCancelWildPlay={cancelPendingWild}
           />
           {players.map((p, i) => {
             const isActive = i === activeIdx;
@@ -424,6 +438,9 @@ function Board({ state, setState }: BoardProps) {
           }}
           onClickBuildPile={onClickBuildPile}
           onClickOwnDiscardPile={onClickOwnDiscardPile}
+          pendingWildBuildPileIndex={pendingWildPlay?.buildPileIndex ?? null}
+          onPickWildDirection={resolvePendingWild}
+          onCancelWildPlay={cancelPendingWild}
         />
         </div>
       </div>
