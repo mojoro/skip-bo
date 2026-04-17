@@ -6,3 +6,18 @@ export interface Card {
   id: string;
   value: CardValue;
 }
+
+export type BuildDirection = 'asc' | 'desc' | null;
+
+export interface BuildPile {
+  cards: Card[];
+  direction: BuildDirection;
+}
+
+export interface PlayerState {
+  id: string;
+  name: string;
+  stockPile: Card[];
+  hand: Card[];
+  discardPiles: Card[][];
+}
