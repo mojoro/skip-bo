@@ -385,3 +385,65 @@ export function applyAction(
 
   return { ok: false, error: 'unknown action type' };
 }
+
+export interface OpponentView {
+  id: string;
+  name: string;
+  handCount: number;
+  stockCount: number;
+  stockTop: Card | null;
+  discardPiles: Card[][];
+}
+
+export interface PlayerView {
+  config: GameConfig;
+  phase: GameState['phase'];
+  turnPhase: GameState['turnPhase'];
+  currentPlayerIndex: number;
+  winningTeamIndex: number | null;
+  stateVersion: number;
+  buildPiles: BuildPile[];
+  drawPileCount: number;
+  youIndex: number;
+  you: PlayerState;
+  opponents: OpponentView[];
+}
+
+export function getPlayerView(state: GameState, playerId: string): PlayerView {
+  const youIndex = state.players.findIndex((p) => p.id === playerId);
+  if (youIndex < 0) throw new Error(`unknown player ${playerId}`);
+  const you = state.players[youIndex];
+  const opponents = state.players
+    .map((p, i) => ({ p, i }))
+    .filter(({ i }) => i !== youIndex)
+    .map(({ p }) => ({
+      id: p.id,
+      name: p.name,
+      handCount: p.hand.length,
+      stockCount: p.stockPile.length,
+      stockTop: p.stockPile.length > 0 ? p.stockPile[p.stockPile.length - 1] : null,
+      discardPiles: p.discardPiles.map((d) => [...d]),
+    }));
+  return {
+    config: state.config,
+    phase: state.phase,
+    turnPhase: state.turnPhase,
+    currentPlayerIndex: state.currentPlayerIndex,
+    winningTeamIndex: state.winningTeamIndex,
+    stateVersion: state.stateVersion,
+    buildPiles: state.buildPiles.map((b) => ({ cards: [...b.cards], direction: b.direction })),
+    drawPileCount: state.drawPile.length,
+    youIndex,
+    you: {
+      id: you.id,
+      name: you.name,
+      hand: [...you.hand],
+      stockPile: [...you.stockPile],
+      discardPiles: you.discardPiles.map((d) => [...d]),
+    },
+    opponents,
+  };
+}
+
+export type { CardSource };
+export type { CardValue } from './types';
