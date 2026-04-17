@@ -1,6 +1,5 @@
 'use client';
 
-import { useDraggable } from '@dnd-kit/react';
 import Card from './Card';
 import { Card as CardType, CardSource } from '@/lib/game/types';
 
@@ -17,20 +16,10 @@ interface DraggableCardProps {
 }
 
 export default function DraggableCard({
-  id,
-  source,
-  disabled,
-  card,
+  id: _id,
+  source: _source,
+  disabled: _disabled,
   ...cardProps
 }: DraggableCardProps) {
-  const { ref, isDragging } = useDraggable({
-    id,
-    data: { source, card },
-    disabled,
-  });
-  return (
-    <div ref={ref} className={isDragging ? 'opacity-40' : ''}>
-      <Card card={card} {...cardProps} />
-    </div>
-  );
+  return <Card {...cardProps} />;
 }

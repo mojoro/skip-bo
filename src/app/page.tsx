@@ -1,8 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { DragDropProvider, DragOverlay } from '@dnd-kit/react';
-import Card from '@/components/Card';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import NewGameModal, {
   NewGameSettings,
@@ -15,7 +13,6 @@ import TableCenter from '@/components/TableCenter';
 import { applyAction, createGame } from '@/lib/game/engine';
 import { Card as CardType, CardSource, GameAction, GameState, WILD } from '@/lib/game/types';
 import { getSeatPositions } from '@/lib/layout/seating';
-import { DragSourceData, DropTargetData } from '@/lib/dnd';
 
 interface PendingDiscard {
   handIndex: number;
@@ -183,23 +180,6 @@ export default function Home() {
     tryDiscard(selection.index, pileIndex, activeIdx);
   };
 
-  const onDragEnd = (event: { canceled: boolean; operation: { source: { data: unknown } | null; target: { data: unknown } | null } }) => {
-    if (event.canceled) return;
-    const src = event.operation.source?.data as DragSourceData | undefined;
-    const tgt = event.operation.target?.data as DropTargetData | undefined;
-    if (!src || !tgt) return;
-    if (tgt.kind === 'build') {
-      tryPlayToBuild(src.source, tgt.index);
-      return;
-    }
-    if (tgt.kind === 'discard') {
-      if (src.source.from !== 'hand') {
-        setMessage('only hand cards can be discarded');
-        return;
-      }
-      tryDiscard(src.source.index, tgt.index, activeIdx);
-    }
-  };
 
   const confirmPendingDiscard = () => {
     if (!pendingDiscard) return;
@@ -215,14 +195,6 @@ export default function Home() {
   const partnershipActive = !!state.config.partnership?.enabled;
 
   return (
-    <DragDropProvider onDragEnd={onDragEnd}>
-    <DragOverlay>
-      {(source) => {
-        const data = source?.data as DragSourceData | undefined;
-        if (!data) return null;
-        return <Card card={data.card} size="md" />;
-      }}
-    </DragOverlay>
     <div className="wood-frame min-h-screen p-2 sm:p-3">
       <div className="felt-surface relative rounded-xl overflow-hidden h-[calc(100vh-24px)] sm:h-[calc(100vh-32px)]">
         {/* Header chrome */}
@@ -365,6 +337,5 @@ export default function Home() {
         onCancel={() => setPendingDiscard(null)}
       />
     </div>
-    </DragDropProvider>
   );
 }
