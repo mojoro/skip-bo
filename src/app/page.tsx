@@ -248,6 +248,29 @@ function Board({ state, setState }: BoardProps) {
           <h1 className="text-base sm:text-lg font-bold tracking-widest shrink-0">
             SKIP<span className="text-[var(--gold)]">·</span>BO
           </h1>
+
+          {/* Status — desktop only, center of header */}
+          <div
+            className="hidden md:block px-3 py-1 rounded-full border border-white/10 text-xs text-white/90 text-center mx-4 truncate max-w-xl"
+            style={{ background: 'rgba(0,0,0,0.45)' }}
+          >
+            {state.phase === 'finished' ? (
+              <span className="text-[var(--gold)] font-bold tracking-wider">
+                {partnershipActive
+                  ? `TEAM ${(state.winningTeamIndex ?? 0) + 1} WINS`
+                  : `${players[state.winningTeamIndex ?? 0].name.toUpperCase()} WINS`}
+              </span>
+            ) : (
+              <span>
+                <span className="text-[var(--gold)] font-semibold">
+                  {activePlayer.name}
+                </span>{' '}
+                — pick a card, then a target
+              </span>
+            )}
+            {message && <span className="ml-3 text-red-300">{message}</span>}
+          </div>
+
           <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs">
             <button
               onClick={() => setRulesetOpen(true)}
@@ -276,10 +299,10 @@ function Board({ state, setState }: BoardProps) {
           </div>
         </header>
 
-        {/* Status ribbon */}
-        <div className="absolute top-10 sm:top-14 left-2 right-2 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-10 flex justify-center pointer-events-none">
+        {/* Status ribbon — mobile only, full-width below header */}
+        <div className="md:hidden absolute top-10 left-2 right-2 z-10 flex justify-center pointer-events-none">
           <div
-            className="px-3 sm:px-4 py-1 sm:py-1.5 rounded-full border border-white/10 text-[11px] sm:text-xs text-white backdrop-blur-sm text-center"
+            className="px-3 py-1 rounded-full border border-white/10 text-[11px] text-white backdrop-blur-sm text-center"
             style={{ background: 'rgba(0,0,0,0.45)' }}
           >
             {state.phase === 'finished' ? (
@@ -296,9 +319,7 @@ function Board({ state, setState }: BoardProps) {
                 — pick a card, then a target
               </span>
             )}
-            {message && (
-              <span className="ml-3 text-red-300">{message}</span>
-            )}
+            {message && <span className="ml-3 text-red-300">{message}</span>}
           </div>
         </div>
 
