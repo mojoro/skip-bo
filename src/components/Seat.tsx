@@ -13,7 +13,7 @@ export type SeatSelection =
   | { kind: 'discard'; pileIndex: number };
 
 interface SeatProps {
-  position: SeatPosition;
+  position?: SeatPosition; // undefined = flat layout (mobile/stacked)
   player: PlayerState;
   playerIndex: number;
   isActive: boolean;
@@ -46,8 +46,9 @@ export default function Seat({
   const stockTop: CardType | null =
     player.stockPile.length > 0 ? player.stockPile[player.stockPile.length - 1] : null;
 
-  const orientation =
-    position.side === 'top'
+  const orientation = !position
+    ? 'rotate-0'
+    : position.side === 'top'
       ? 'rotate-180'
       : position.side === 'left'
         ? '-rotate-90'
@@ -59,23 +60,15 @@ export default function Seat({
     ? 'ring-2 ring-[var(--gold)] shadow-[0_0_24px_rgba(217,164,65,0.45)]'
     : 'ring-1 ring-black/30';
 
-  return (
-    <div
-      className="absolute"
-      style={{
-        left: `${position.xPct}%`,
-        top: `${position.yPct}%`,
-        transform: 'translate(-50%, -50%)',
-      }}
-    >
-      <div className={`${orientation} origin-center`}>
-        <div
-          className={`relative rounded-xl ${activeRing} px-4 py-3 backdrop-blur-[1px]`}
-          style={{
-            background: 'rgba(0, 0, 0, 0.35)',
-            boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)',
-          }}
-        >
+  const body = (
+    <div className={`${orientation} origin-center`}>
+      <div
+        className={`relative rounded-xl ${activeRing} px-3 py-2 sm:px-4 sm:py-3 backdrop-blur-[1px]`}
+        style={{
+          background: 'rgba(0, 0, 0, 0.35)',
+          boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)',
+        }}
+      >
           {/* Team color strip */}
           {teamColor && (
             <div
@@ -211,6 +204,19 @@ export default function Seat({
           </div>
         </div>
       </div>
+  );
+
+  if (!position) return body;
+  return (
+    <div
+      className="absolute"
+      style={{
+        left: `${position.xPct}%`,
+        top: `${position.yPct}%`,
+        transform: 'translate(-50%, -50%)',
+      }}
+    >
+      {body}
     </div>
   );
 }
