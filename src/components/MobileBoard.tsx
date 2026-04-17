@@ -42,10 +42,10 @@ export default function MobileBoard({
   const emptyLabel = state.config.bidirectionalBuild ? '1/12/W' : '1/W';
 
   return (
-    <div className="md:hidden absolute inset-0 pt-[72px] pb-2 px-2 flex flex-col gap-2 overflow-y-auto">
-      {/* Opponents stack */}
-      <div className="flex flex-col gap-1.5">
-        {opponents.map(({ player, index }) => {
+    <div className="absolute inset-0 pt-[72px] pb-0 px-2 flex flex-col gap-2 max-w-3xl mx-auto left-0 right-0">
+      {/* Opponents stack — scrolls when too many */}
+      <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-auto pb-1">
+        {opponents.map(({ player }) => {
           const team = teamColorFor(player.id);
           return (
             <MobileOpponentStrip
@@ -58,6 +58,8 @@ export default function MobileBoard({
         })}
       </div>
 
+      {/* Active-player zone — stays pinned at the bottom regardless of opponent count */}
+      <div className="flex flex-col gap-2 shrink-0 pb-2">
       {/* Build row: your stock + 4 build piles */}
       <div
         className="relative rounded-lg px-2 py-2 flex items-start gap-2 justify-center"
@@ -199,6 +201,7 @@ export default function MobileBoard({
             );
           })}
         </div>
+      </div>
       </div>
     </div>
   );
