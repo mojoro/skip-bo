@@ -85,6 +85,8 @@ export function DragDropProvider({ onDragEnd, children }: DragDropProviderProps)
 
   useEffect(() => {
     if (!drag) return;
+    const prevCursor = document.body.style.cursor;
+    document.body.style.cursor = 'grabbing';
     const onMove = (e: PointerEvent) => {
       if (e.pointerId !== drag.pointerId) return;
       const node = ghostRef.current;
@@ -116,6 +118,7 @@ export function DragDropProvider({ onDragEnd, children }: DragDropProviderProps)
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onCancel);
       window.removeEventListener('keydown', onKey);
+      document.body.style.cursor = prevCursor;
     };
   }, [drag]);
 

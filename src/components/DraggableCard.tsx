@@ -31,7 +31,7 @@ export default function DraggableCard({
   return (
     <div
       ref={ref}
-      style={{ touchAction: 'none' }}
+      style={{ touchAction: 'none', cursor: disabled ? 'default' : 'grab' }}
       className={isDragging ? 'opacity-30' : ''}
     >
       <Card card={card} {...cardProps} />
