@@ -45,6 +45,25 @@ export interface StartDragInit {
 
 const DragDropContext = createContext<DragDropContextValue | null>(null);
 
+function hitTestTargets(
+  targets: Map<string, TargetRegistration>,
+  x: number,
+  y: number,
+): string | null {
+  let bestId: string | null = null;
+  let bestArea = Infinity; // prefer smaller (more specific) targets
+  for (const [id, reg] of targets) {
+    const r = reg.element.getBoundingClientRect();
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+    const area = r.width * r.height;
+    if (area < bestArea) {
+      bestArea = area;
+      bestId = id;
+    }
+  }
+  return bestId;
+}
+
 export function useDragDrop(): DragDropContextValue {
   const ctx = useContext(DragDropContext);
   if (!ctx) throw new Error('useDragDrop must be used inside DragDropProvider');
@@ -69,10 +88,13 @@ export function DragDropProvider({ onDragEnd, children }: DragDropProviderProps)
     const onMove = (e: PointerEvent) => {
       if (e.pointerId !== drag.pointerId) return;
       const node = ghostRef.current;
-      if (!node) return;
-      const x = e.clientX - drag.pointerOffset.x;
-      const y = e.clientY - drag.pointerOffset.y;
-      node.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      if (node) {
+        const x = e.clientX - drag.pointerOffset.x;
+        const y = e.clientY - drag.pointerOffset.y;
+        node.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      }
+      const hit = hitTestTargets(targetsRef.current, e.clientX, e.clientY);
+      setHoveredTargetId((prev) => (prev === hit ? prev : hit));
     };
     window.addEventListener('pointermove', onMove);
     return () => {
