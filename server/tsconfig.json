@@ -12,7 +12,6 @@
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
     "types": ["node"],
-    "rootDir": ".",
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
