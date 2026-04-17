@@ -236,14 +236,26 @@ export default function Home() {
               teamColor={teamColor}
               selection={isActive ? selection : { kind: 'none' }}
               cardSize={players.length > 4 ? 'sm' : 'md'}
-              onSelectHand={(idx) => setSelection({ kind: 'hand', index: idx })}
-              onSelectStock={() =>
-                activePlayer.stockPile.length > 0 && setSelection({ kind: 'stock' })
+              onSelectHand={(idx) =>
+                setSelection((prev) =>
+                  prev.kind === 'hand' && prev.index === idx
+                    ? { kind: 'none' }
+                    : { kind: 'hand', index: idx },
+                )
               }
+              onSelectStock={() => {
+                if (activePlayer.stockPile.length === 0) return;
+                setSelection((prev) =>
+                  prev.kind === 'stock' ? { kind: 'none' } : { kind: 'stock' },
+                );
+              }}
               onSelectDiscard={(pileIdx) => {
-                if (activePlayer.discardPiles[pileIdx].length > 0) {
-                  setSelection({ kind: 'discard', pileIndex: pileIdx });
-                }
+                if (activePlayer.discardPiles[pileIdx].length === 0) return;
+                setSelection((prev) =>
+                  prev.kind === 'discard' && prev.pileIndex === pileIdx
+                    ? { kind: 'none' }
+                    : { kind: 'discard', pileIndex: pileIdx },
+                );
               }}
               onClickDiscardTarget={onClickOwnDiscardPile}
             />
