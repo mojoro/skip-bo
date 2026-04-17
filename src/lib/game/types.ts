@@ -21,3 +21,36 @@ export interface PlayerState {
   hand: Card[];
   discardPiles: Card[][];
 }
+
+export type GamePhase = 'waiting' | 'playing' | 'finished';
+export type TurnPhase = 'play' | 'discard';
+
+export interface GameState {
+  phase: GamePhase;
+  turnPhase: TurnPhase;
+  drawPile: Card[];
+  completedBuildPiles: Card[];
+  buildPiles: BuildPile[];
+  players: PlayerState[];
+  currentPlayerIndex: number;
+  winningTeamIndex: number | null;
+  stateVersion: number;
+}
+
+export type CardSource =
+  | { from: 'hand'; index: number }
+  | { from: 'stock'; playerIndex: number }
+  | { from: 'discard'; playerIndex: number; pileIndex: number };
+
+export type GameAction =
+  | {
+      type: 'PLAY_TO_BUILD';
+      source: CardSource;
+      buildPileIndex: number;
+      declaredDirection?: BuildDirection;
+    }
+  | { type: 'DISCARD'; handIndex: number; discardPileIndex: number; targetPlayerIndex: number };
+
+export type ActionResult =
+  | { ok: true; state: GameState }
+  | { ok: false; error: string };
