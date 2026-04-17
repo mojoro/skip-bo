@@ -5,10 +5,12 @@ import {
   ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
+import DragGhost from '@/components/DragGhost';
 import { DragSourceData, DropTargetData } from './types';
 
 export interface DragState {
@@ -58,8 +60,25 @@ export function DragDropProvider({ onDragEnd, children }: DragDropProviderProps)
   const [drag, setDrag] = useState<DragState | null>(null);
   const [hoveredTargetId, setHoveredTargetId] = useState<string | null>(null);
   const targetsRef = useRef<Map<string, TargetRegistration>>(new Map());
+  const ghostRef = useRef<HTMLDivElement | null>(null);
   const onDragEndRef = useRef(onDragEnd);
   onDragEndRef.current = onDragEnd;
+
+  useEffect(() => {
+    if (!drag) return;
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerId !== drag.pointerId) return;
+      const node = ghostRef.current;
+      if (!node) return;
+      const x = e.clientX - drag.pointerOffset.x;
+      const y = e.clientY - drag.pointerOffset.y;
+      node.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    };
+    window.addEventListener('pointermove', onMove);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+    };
+  }, [drag]);
 
   const registerTarget = useCallback((id: string, reg: TargetRegistration) => {
     targetsRef.current.set(id, reg);
@@ -107,5 +126,10 @@ export function DragDropProvider({ onDragEnd, children }: DragDropProviderProps)
     [drag, hoveredTargetId, registerTarget, unregisterTarget, startDrag, endDrag],
   );
 
-  return <DragDropContext.Provider value={value}>{children}</DragDropContext.Provider>;
+  return (
+    <DragDropContext.Provider value={value}>
+      {children}
+      {drag && <DragGhost ghostRef={ghostRef} drag={drag} />}
+    </DragDropContext.Provider>
+  );
 }
