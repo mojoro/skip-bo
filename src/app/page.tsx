@@ -1,65 +1,268 @@
-import Image from "next/image";
+'use client';
+
+import { useMemo, useState } from 'react';
+import NewGameModal, {
+  NewGameSettings,
+  buildPartnershipFromSettings,
+  settingsToConfigOverrides,
+} from '@/components/NewGameModal';
+import RulesetInfo from '@/components/RulesetInfo';
+import Seat, { SeatSelection } from '@/components/Seat';
+import TableCenter from '@/components/TableCenter';
+import { applyAction, createGame } from '@/lib/game/engine';
+import { CardSource, GameAction, GameState, WILD } from '@/lib/game/types';
+import { getSeatPositions } from '@/lib/layout/seating';
+
+const TEAM_COLORS = [
+  '#eab308', // amber
+  '#0ea5e9', // sky
+  '#ec4899', // pink
+  '#84cc16', // lime
+];
+
+function makeGameFromSettings(settings: NewGameSettings): GameState {
+  const players = Array.from({ length: settings.playerCount }, (_, i) => ({
+    id: `p${i + 1}`,
+    name: `Player ${i + 1}`,
+  }));
+  return createGame({
+    players,
+    ruleset: settings.ruleset,
+    overrides: settingsToConfigOverrides(settings),
+    partnership: buildPartnershipFromSettings(
+      settings,
+      players.map((p) => p.id),
+    ),
+  });
+}
+
+function defaultInitialGame(): GameState {
+  return createGame({
+    players: [
+      { id: 'p1', name: 'Player 1' },
+      { id: 'p2', name: 'Player 2' },
+    ],
+    ruleset: 'recommended',
+  });
+}
 
 export default function Home() {
+  const [state, setState] = useState<GameState>(() => defaultInitialGame());
+  const [selection, setSelection] = useState<SeatSelection>({ kind: 'none' });
+  const [message, setMessage] = useState<string>('');
+  const [newGameOpen, setNewGameOpen] = useState(false);
+  const [rulesetOpen, setRulesetOpen] = useState(false);
+
+  const players = state.players;
+  const activeIdx = state.currentPlayerIndex;
+  const activePlayer = players[activeIdx];
+
+  const seatPositions = useMemo(() => getSeatPositions(players.length), [players.length]);
+
+  // Rotate seat geometry so the active player sits at the bottom (index 0 in layout).
+  const seatOf = (playerIdx: number) => {
+    const rotated = (playerIdx - activeIdx + players.length) % players.length;
+    return seatPositions[rotated];
+  };
+
+  const teamForPlayerId = (id: string): number | null => {
+    const teams = state.config.partnership?.teams;
+    if (!teams) return null;
+    for (let i = 0; i < teams.length; i++) {
+      if (teams[i].includes(id)) return i;
+    }
+    return null;
+  };
+
+  const selectedCard = useMemo(() => {
+    if (selection.kind === 'hand') return activePlayer.hand[selection.index] ?? null;
+    if (selection.kind === 'stock') {
+      return activePlayer.stockPile[activePlayer.stockPile.length - 1] ?? null;
+    }
+    if (selection.kind === 'discard') {
+      const pile = activePlayer.discardPiles[selection.pileIndex];
+      return pile[pile.length - 1] ?? null;
+    }
+    return null;
+  }, [selection, activePlayer]);
+
+  const sourceFromSelection = (): CardSource | null => {
+    if (selection.kind === 'hand') return { from: 'hand', index: selection.index };
+    if (selection.kind === 'stock') return { from: 'stock', playerIndex: activeIdx };
+    if (selection.kind === 'discard') {
+      return { from: 'discard', playerIndex: activeIdx, pileIndex: selection.pileIndex };
+    }
+    return null;
+  };
+
+  const dispatch = (action: GameAction) => {
+    const result = applyAction(state, action);
+    if (!result.ok) {
+      setMessage(result.error);
+      return;
+    }
+    setState(result.state);
+    setSelection({ kind: 'none' });
+    setMessage('');
+  };
+
+  const startGame = (settings: NewGameSettings) => {
+    setState(makeGameFromSettings(settings));
+    setSelection({ kind: 'none' });
+    setMessage('');
+    setNewGameOpen(false);
+  };
+
+  const onClickBuildPile = (buildPileIndex: number) => {
+    const source = sourceFromSelection();
+    if (!source) {
+      setMessage('select a card first');
+      return;
+    }
+    const pile = state.buildPiles[buildPileIndex];
+    const isEmpty = pile.cards.length === 0;
+    let declaredDirection: 'asc' | 'desc' | undefined;
+    if (isEmpty && state.config.bidirectionalBuild && selectedCard?.value === WILD) {
+      const goAsc = window.confirm(
+        'Start ascending (from 1)?\nOK = ascending, Cancel = descending.',
+      );
+      declaredDirection = goAsc ? 'asc' : 'desc';
+    }
+    dispatch({
+      type: 'PLAY_TO_BUILD',
+      source,
+      buildPileIndex,
+      declaredDirection,
+    });
+  };
+
+  const onClickOwnDiscardPile = (pileIndex: number) => {
+    if (selection.kind !== 'hand') {
+      setMessage('select a hand card to discard');
+      return;
+    }
+    dispatch({
+      type: 'DISCARD',
+      handIndex: selection.index,
+      discardPileIndex: pileIndex,
+      targetPlayerIndex: activeIdx,
+    });
+  };
+
+  const partnershipActive = !!state.config.partnership?.enabled;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="wood-frame min-h-screen p-2 sm:p-3">
+      <div className="felt-surface relative rounded-xl overflow-hidden h-[calc(100vh-24px)] sm:h-[calc(100vh-32px)]">
+        {/* Header chrome */}
+        <header className="absolute top-3 left-4 right-4 z-20 flex items-center justify-between text-white">
+          <h1 className="text-lg font-bold tracking-widest">
+            SKIP<span className="text-[var(--gold)]">·</span>BO
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+          <div className="flex items-center gap-2 text-xs">
+            <button
+              onClick={() => setRulesetOpen(true)}
+              className="bg-black/40 hover:bg-black/55 border border-white/15 px-3 py-1 rounded flex items-center gap-1"
+              title="View ruleset"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              <span>ruleset: {state.config.ruleset}</span>
+              <span className="text-[var(--gold)]">ⓘ</span>
+            </button>
+            {partnershipActive && (
+              <span className="bg-black/40 border border-white/15 px-2 py-1 rounded">
+                partnerships
+              </span>
+            )}
+            <button
+              onClick={() => setNewGameOpen(true)}
+              className="bg-[var(--gold)] text-stone-900 font-semibold hover:brightness-110 px-3 py-1 rounded"
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+              New Game
+            </button>
+          </div>
+        </header>
+
+        {/* Status ribbon */}
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10">
+          <div
+            className="px-4 py-1.5 rounded-full border border-white/10 text-xs text-white backdrop-blur-sm"
+            style={{ background: 'rgba(0,0,0,0.45)' }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            {state.phase === 'finished' ? (
+              <span className="text-[var(--gold)] font-bold tracking-wider">
+                {partnershipActive
+                  ? `TEAM ${(state.winningTeamIndex ?? 0) + 1} WINS`
+                  : `${players[state.winningTeamIndex ?? 0].name.toUpperCase()} WINS`}
+              </span>
+            ) : (
+              <span>
+                <span className="text-[var(--gold)] font-semibold">
+                  {activePlayer.name}
+                </span>{' '}
+                — pick a card, then a target
+              </span>
+            )}
+            {message && (
+              <span className="ml-3 text-red-300">{message}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Central play surface */}
+        <TableCenter
+          buildPiles={state.buildPiles}
+          drawPileCount={state.drawPile.length}
+          completedPileCount={state.completedBuildPiles.length}
+          config={state.config}
+          onClickBuildPile={onClickBuildPile}
+        />
+
+        {/* Seats */}
+        {players.map((p, i) => {
+          const isActive = i === activeIdx;
+          const isYou = isActive; // hot-seat: always show active player's cards
+          const teamIndex = teamForPlayerId(p.id);
+          const teamColor =
+            teamIndex !== null ? TEAM_COLORS[teamIndex % TEAM_COLORS.length] : null;
+          const position = seatOf(i);
+          return (
+            <Seat
+              key={p.id}
+              position={position}
+              player={p}
+              isActive={isActive}
+              isYou={isYou}
+              teamIndex={teamIndex}
+              teamColor={teamColor}
+              selection={isActive ? selection : { kind: 'none' }}
+              cardSize={players.length > 4 ? 'sm' : 'md'}
+              onSelectHand={(idx) => setSelection({ kind: 'hand', index: idx })}
+              onSelectStock={() =>
+                activePlayer.stockPile.length > 0 && setSelection({ kind: 'stock' })
+              }
+              onSelectDiscard={(pileIdx) => {
+                if (activePlayer.discardPiles[pileIdx].length > 0) {
+                  setSelection({ kind: 'discard', pileIndex: pileIdx });
+                }
+              }}
+              onClickDiscardTarget={onClickOwnDiscardPile}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+          );
+        })}
+      </div>
+
+      <NewGameModal
+        open={newGameOpen}
+        onCancel={() => setNewGameOpen(false)}
+        onStart={startGame}
+        defaultPlayerCount={players.length}
+      />
+      <RulesetInfo
+        open={rulesetOpen}
+        onClose={() => setRulesetOpen(false)}
+        config={state.config}
+        playerNames={players.map((p) => p.name)}
+      />
     </div>
   );
 }
