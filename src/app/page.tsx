@@ -8,6 +8,7 @@ import NewGameModal, {
   buildPartnershipFromSettings,
   settingsToConfigOverrides,
 } from '@/components/NewGameModal';
+import MobileBoard from '@/components/MobileBoard';
 import RulesetInfo from '@/components/RulesetInfo';
 import Seat, { SeatSelection } from '@/components/Seat';
 import TableCenter from '@/components/TableCenter';
@@ -106,6 +107,14 @@ function Board({ state, setState }: BoardProps) {
       if (teams[i].includes(id)) return i;
     }
     return null;
+  };
+
+  const teamInfoForPlayerId = (id: string): { index: number | null; color: string | null } => {
+    const index = teamForPlayerId(id);
+    return {
+      index,
+      color: index !== null ? TEAM_COLORS[index % TEAM_COLORS.length] : null,
+    };
   };
 
   const selectedCard = useMemo(() => {
@@ -376,79 +385,40 @@ function Board({ state, setState }: BoardProps) {
           })}
         </div>
 
-        {/* Mobile: stacked column — opponents, build piles, you */}
-        <div className="md:hidden absolute inset-0 pt-20 pb-3 px-2 flex flex-col gap-2 overflow-y-auto">
-          {players
-            .map((p, i) => ({ p, i }))
-            .filter(({ i }) => i !== activeIdx)
-            .map(({ p, i }) => {
-              const teamIndex = teamForPlayerId(p.id);
-              const teamColor =
-                teamIndex !== null ? TEAM_COLORS[teamIndex % TEAM_COLORS.length] : null;
-              return (
-                <Seat
-                  key={p.id}
-                  player={p}
-                  playerIndex={i}
-                  isActive={false}
-                  isYou={false}
-                  teamIndex={teamIndex}
-                  teamColor={teamColor}
-                  selection={{ kind: 'none' }}
-                  cardSize="sm"
-                />
-              );
-            })}
-          <div className="my-1">
-            <TableCenter
-              buildPiles={state.buildPiles}
-              drawPileCount={state.drawPile.length}
-              completedPileCount={state.completedBuildPiles.length}
-              config={state.config}
-              onClickBuildPile={onClickBuildPile}
-            />
-          </div>
-          {(() => {
-            const teamIndex = teamForPlayerId(activePlayer.id);
-            const teamColor =
-              teamIndex !== null ? TEAM_COLORS[teamIndex % TEAM_COLORS.length] : null;
-            return (
-              <Seat
-                key={`${activePlayer.id}-mobile`}
-                player={activePlayer}
-                playerIndex={activeIdx}
-                isActive={true}
-                isYou={true}
-                teamIndex={teamIndex}
-                teamColor={teamColor}
-                selection={selection}
-                cardSize="sm"
-                onSelectHand={(idx) =>
-                  setSelection((prev) =>
-                    prev.kind === 'hand' && prev.index === idx
-                      ? { kind: 'none' }
-                      : { kind: 'hand', index: idx },
-                  )
-                }
-                onSelectStock={() => {
-                  if (activePlayer.stockPile.length === 0) return;
-                  setSelection((prev) =>
-                    prev.kind === 'stock' ? { kind: 'none' } : { kind: 'stock' },
-                  );
-                }}
-                onSelectDiscard={(pileIdx) => {
-                  if (activePlayer.discardPiles[pileIdx].length === 0) return;
-                  setSelection((prev) =>
-                    prev.kind === 'discard' && prev.pileIndex === pileIdx
-                      ? { kind: 'none' }
-                      : { kind: 'discard', pileIndex: pileIdx },
-                  );
-                }}
-                onClickDiscardTarget={onClickOwnDiscardPile}
-              />
+        {/* Mobile: custom compact layout — see MobileBoard component */}
+        <MobileBoard
+          state={state}
+          activePlayer={activePlayer}
+          activeIdx={activeIdx}
+          selection={selection}
+          teamColorFor={teamInfoForPlayerId}
+          opponents={players
+            .map((p, i) => ({ player: p, index: i }))
+            .filter(({ index }) => index !== activeIdx)}
+          onSelectHand={(idx) =>
+            setSelection((prev) =>
+              prev.kind === 'hand' && prev.index === idx
+                ? { kind: 'none' }
+                : { kind: 'hand', index: idx },
+            )
+          }
+          onSelectStock={() => {
+            if (activePlayer.stockPile.length === 0) return;
+            setSelection((prev) =>
+              prev.kind === 'stock' ? { kind: 'none' } : { kind: 'stock' },
             );
-          })()}
-        </div>
+          }}
+          onSelectDiscard={(pileIdx) => {
+            if (activePlayer.discardPiles[pileIdx].length === 0) return;
+            setSelection((prev) =>
+              prev.kind === 'discard' && prev.pileIndex === pileIdx
+                ? { kind: 'none' }
+                : { kind: 'discard', pileIndex: pileIdx },
+            );
+          }}
+          onClickBuildPile={onClickBuildPile}
+          onClickOwnDiscardPile={onClickOwnDiscardPile}
+        />
       </div>
 
       <NewGameModal
