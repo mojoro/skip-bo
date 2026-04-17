@@ -1,0 +1,278 @@
+openapi: 3.1.0
+info:
+  title: Skip-Bo Game Server
+  version: 0.1.0
+  description: REST and SSE surface for room management and the lobby feed.
+servers:
+  - url: http://localhost:8787/v1
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: Opaque session UUID held by the client.
+  schemas:
+    GameConfig:
+      type: object
+      required: [ruleset, stockPileSize, handSize, bidirectionalBuild, maxPlayers, partnership]
+      properties:
+        ruleset: { type: string, enum: [recommended, official] }
+        stockPileSize: { type: integer, minimum: 5, maximum: 50 }
+        handSize: { type: integer, minimum: 3, maximum: 10 }
+        bidirectionalBuild: { type: boolean }
+        maxPlayers: { type: integer, minimum: 2, maximum: 8 }
+        partnership:
+          oneOf:
+            - type: 'null'
+            - type: object
+              properties:
+                enabled: { type: boolean }
+                teams: { type: array, items: { type: array, items: { type: string } } }
+                allowPlayFromPartnerStock: { type: boolean }
+                allowPlayFromPartnerDiscard: { type: boolean }
+                allowDiscardToPartnerDiscard: { type: boolean }
+    SlotSummary:
+      type: object
+      properties:
+        humans: { type: integer }
+        ai: { type: integer }
+        open: { type: integer }
+        locked: { type: integer }
+        capacity: { type: integer }
+    RoomInfo:
+      type: object
+      required: [id, displayName, phase, config, allowAiFill, visibility, slotSummary, hostName, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, nullable: true }
+        displayName: { type: string }
+        phase: { type: string, enum: [waiting, playing, finished] }
+        config: { $ref: '#/components/schemas/GameConfig' }
+        allowAiFill: { type: boolean }
+        visibility: { type: string, enum: [public, private] }
+        slotSummary: { $ref: '#/components/schemas/SlotSummary' }
+        hostName: { type: string }
+        createdAt: { type: integer }
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+  responses:
+    Problem:
+      description: Problem+JSON
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+security:
+  - bearer: []
+paths:
+  /rooms:
+    post:
+      summary: Create a room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [playerName, config, allowAiFill, visibility]
+              properties:
+                playerName: { type: string }
+                displayName: { type: string }
+                config: { $ref: '#/components/schemas/GameConfig' }
+                allowAiFill: { type: boolean }
+                visibility: { type: string, enum: [public, private] }
+      responses:
+        '201':
+          description: Room created
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roomId: { type: string }
+                  code: { type: string }
+                  room: { $ref: '#/components/schemas/RoomInfo' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+    get:
+      summary: List rooms
+      security: []
+      parameters:
+        - in: query
+          name: code
+          schema: { type: string }
+        - in: query
+          name: visibility
+          schema: { type: string, enum: [public, private] }
+        - in: query
+          name: phase
+          schema: { type: string, enum: [waiting, playing, finished] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rooms: { type: array, items: { $ref: '#/components/schemas/RoomInfo' } }
+                  stats:
+                    type: object
+                    properties:
+                      gamesInProgress: { type: integer }
+                      playersOnline: { type: integer }
+  /rooms/{roomId}:
+    get:
+      summary: Get a room
+      security: []
+      parameters:
+        - in: path
+          name: roomId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoomInfo' }
+        '404': { $ref: '#/components/responses/Problem' }
+    patch:
+      summary: Update room settings (host only)
+      parameters:
+        - in: path
+          name: roomId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string }
+                config: { $ref: '#/components/schemas/GameConfig' }
+                allowAiFill: { type: boolean }
+                visibility: { type: string, enum: [public, private] }
+      responses:
+        '204': { description: Updated }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /rooms/{roomId}/game:
+    post:
+      summary: Start the game
+      parameters:
+        - in: path
+          name: roomId
+          required: true
+          schema: { type: string }
+      responses:
+        '201':
+          description: Game started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  startedAt: { type: integer }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /rooms/{roomId}/members:
+    post:
+      summary: Join a room
+      parameters:
+        - in: path
+          name: roomId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [playerName]
+              properties:
+                playerName: { type: string }
+      responses:
+        '201':
+          description: Joined
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  room: { $ref: '#/components/schemas/RoomInfo' }
+                  wsUrl: { type: string }
+                  slotIndex: { type: integer }
+        '409': { $ref: '#/components/responses/Problem' }
+  /rooms/{roomId}/members/{sessionId}:
+    delete:
+      summary: Leave or kick
+      parameters:
+        - in: path
+          name: roomId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: sessionId
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: Removed }
+        '403': { $ref: '#/components/responses/Problem' }
+  /rooms/{roomId}/slots/{index}:
+    put:
+      summary: Set slot state (host only)
+      parameters:
+        - in: path
+          name: roomId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: index
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  properties: { kind: { type: string, enum: [open] } }
+                - type: object
+                  properties: { kind: { type: string, enum: [locked] } }
+                - type: object
+                  properties:
+                    kind: { type: string, enum: [ai] }
+                    difficulty: { type: string, enum: [easy] }
+      responses:
+        '204': { description: Updated }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /lobby/stream:
+    get:
+      summary: Lobby SSE feed
+      security: []
+      parameters:
+        - in: query
+          name: sessionId
+          schema: { type: string }
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema: { type: string }
