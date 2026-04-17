@@ -87,7 +87,7 @@ function pickStartingPlayerIndex(players: PlayerState[], rng: () => number): num
   let bestValue = -1;
   let tied: number[] = [];
   for (let i = 0; i < players.length; i++) {
-    const v = stockValue(players[i]);
+    const v = stockValue(players[i]!);
     if (v > bestValue) {
       bestValue = v;
       tied = [i];
@@ -95,7 +95,7 @@ function pickStartingPlayerIndex(players: PlayerState[], rng: () => number): num
       tied.push(i);
     }
   }
-  return tied[Math.floor(rng() * tied.length)];
+  return tied[Math.floor(rng() * tied.length)]!;
 }
 
 function validateConfig(config: GameConfig): void {
@@ -139,15 +139,15 @@ function teamIndexOfPlayer(state: GameState, playerId: string): number | null {
   const teams = state.config.partnership?.teams;
   if (!teams) return null;
   for (let i = 0; i < teams.length; i++) {
-    if (teams[i].includes(playerId)) return i;
+    if (teams[i]!.includes(playerId)) return i;
   }
   return null;
 }
 
 function playersOnSameTeam(state: GameState, aIdx: number, bIdx: number): boolean {
   if (aIdx === bIdx) return true;
-  const pa = state.players[aIdx];
-  const pb = state.players[bIdx];
+  const pa = state.players[aIdx]!;
+  const pb = state.players[bIdx]!;
   const ta = teamIndexOfPlayer(state, pa.id);
   const tb = teamIndexOfPlayer(state, pb.id);
   return ta !== null && tb !== null && ta === tb;
@@ -209,7 +209,7 @@ function drawFromPile(state: GameState, rng: () => number): Card | null {
 }
 
 function refillHand(state: GameState, playerIndex: number, rng: () => number): void {
-  const p = state.players[playerIndex];
+  const p = state.players[playerIndex]!;
   while (p.hand.length < state.config.handSize) {
     const card = drawFromPile(state, rng);
     if (!card) break;
@@ -218,7 +218,7 @@ function refillHand(state: GameState, playerIndex: number, rng: () => number): v
 }
 
 function maybeCompletePile(state: GameState, buildPileIndex: number): void {
-  const pile = state.buildPiles[buildPileIndex];
+  const pile = state.buildPiles[buildPileIndex]!;
   if (pile.cards.length === 12) {
     state.completedBuildPiles.push(...pile.cards);
     state.buildPiles[buildPileIndex] = { cards: [], direction: null };
@@ -235,7 +235,7 @@ function checkWin(state: GameState): void {
   const partnership = state.config.partnership;
   if (partnership && partnership.enabled) {
     for (let t = 0; t < partnership.teams.length; t++) {
-      const allEmpty = partnership.teams[t].every((pid) => {
+      const allEmpty = partnership.teams[t]!.every((pid) => {
         const p = state.players.find((pp) => pp.id === pid);
         return !!p && p.stockPile.length === 0;
       });
@@ -248,7 +248,7 @@ function checkWin(state: GameState): void {
     return;
   }
   for (let i = 0; i < state.players.length; i++) {
-    if (state.players[i].stockPile.length === 0) {
+    if (state.players[i]!.stockPile.length === 0) {
       state.phase = 'finished';
       state.winningTeamIndex = i;
       return;
@@ -265,14 +265,14 @@ function resolveSource(
   actorIndex: number,
   source: CardSource,
 ): ResolvedSource {
-  const actor = state.players[actorIndex];
+  const actor = state.players[actorIndex]!;
   const partnership = state.config.partnership;
 
   if (source.from === 'hand') {
     if (source.index < 0 || source.index >= actor.hand.length) {
       return { ok: false, error: 'invalid hand index' };
     }
-    const card = actor.hand[source.index];
+    const card = actor.hand[source.index]!;
     return { ok: true, card, remove: () => actor.hand.splice(source.index, 1) };
   }
 
@@ -281,7 +281,7 @@ function resolveSource(
     if (ownerIdx < 0 || ownerIdx >= state.players.length) {
       return { ok: false, error: 'invalid stock owner' };
     }
-    const owner = state.players[ownerIdx];
+    const owner = state.players[ownerIdx]!;
     if (owner.stockPile.length === 0) return { ok: false, error: 'stock pile empty' };
     if (ownerIdx !== actorIndex) {
       if (!partnership?.allowPlayFromPartnerStock) {
@@ -291,7 +291,7 @@ function resolveSource(
         return { ok: false, error: 'not on same team' };
       }
     }
-    const card = owner.stockPile[owner.stockPile.length - 1];
+    const card = owner.stockPile[owner.stockPile.length - 1]!;
     return { ok: true, card, remove: () => owner.stockPile.pop() };
   }
 
@@ -302,8 +302,8 @@ function resolveSource(
   if (source.pileIndex < 0 || source.pileIndex >= DISCARD_PILE_COUNT) {
     return { ok: false, error: 'invalid discard pile index' };
   }
-  const owner = state.players[ownerIdx];
-  const pile = owner.discardPiles[source.pileIndex];
+  const owner = state.players[ownerIdx]!;
+  const pile = owner.discardPiles[source.pileIndex]!;
   if (pile.length === 0) return { ok: false, error: 'discard pile empty' };
   if (ownerIdx !== actorIndex) {
     if (!partnership?.allowPlayFromPartnerDiscard) {
@@ -313,7 +313,7 @@ function resolveSource(
       return { ok: false, error: 'not on same team' };
     }
   }
-  const card = pile[pile.length - 1];
+  const card = pile[pile.length - 1]!;
   return { ok: true, card, remove: () => pile.pop() };
 }
 
@@ -335,7 +335,7 @@ export function applyAction(
     const source = resolveSource(next, actorIndex, action.source);
     if (!source.ok) return { ok: false, error: source.error };
 
-    const pile = next.buildPiles[action.buildPileIndex];
+    const pile = next.buildPiles[action.buildPileIndex]!;
     const check = canPlayCardOnPile(pile, source.card, next.config, action.declaredDirection);
     if (!check.ok) return { ok: false, error: check.error };
 
@@ -344,7 +344,7 @@ export function applyAction(
     pile.direction = check.resolvedDirection;
     maybeCompletePile(next, action.buildPileIndex);
 
-    if (next.players[actorIndex].hand.length === 0) {
+    if (next.players[actorIndex]!.hand.length === 0) {
       refillHand(next, actorIndex, rng);
     }
 
@@ -354,7 +354,7 @@ export function applyAction(
   }
 
   if (action.type === 'DISCARD') {
-    const actor = next.players[actorIndex];
+    const actor = next.players[actorIndex]!;
     if (action.handIndex < 0 || action.handIndex >= actor.hand.length) {
       return { ok: false, error: 'invalid hand index' };
     }
@@ -375,7 +375,7 @@ export function applyAction(
       }
     }
     const [card] = actor.hand.splice(action.handIndex, 1);
-    next.players[targetIdx].discardPiles[action.discardPileIndex].push(card);
+    next.players[targetIdx]!.discardPiles[action.discardPileIndex]!.push(card!);
 
     checkWin(next);
     if (next.phase === 'playing') advanceTurn(next, rng);
@@ -412,7 +412,7 @@ export interface PlayerView {
 export function getPlayerView(state: GameState, playerId: string): PlayerView {
   const youIndex = state.players.findIndex((p) => p.id === playerId);
   if (youIndex < 0) throw new Error(`unknown player ${playerId}`);
-  const you = state.players[youIndex];
+  const you = state.players[youIndex]!;
   const opponents = state.players
     .map((p, i) => ({ p, i }))
     .filter(({ i }) => i !== youIndex)
@@ -421,7 +421,7 @@ export function getPlayerView(state: GameState, playerId: string): PlayerView {
       name: p.name,
       handCount: p.hand.length,
       stockCount: p.stockPile.length,
-      stockTop: p.stockPile.length > 0 ? p.stockPile[p.stockPile.length - 1] : null,
+      stockTop: p.stockPile.length > 0 ? p.stockPile[p.stockPile.length - 1]! : null,
       discardPiles: p.discardPiles.map((d) => [...d]),
     }));
   return {
