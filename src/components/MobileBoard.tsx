@@ -1,0 +1,205 @@
+'use client';
+
+import Card from '@/components/Card';
+import DraggableCard from '@/components/DraggableCard';
+import DroppableZone from '@/components/DroppableZone';
+import MobileOpponentStrip from '@/components/MobileOpponentStrip';
+import { Card as CardType, GameState, PlayerState } from '@/lib/game/types';
+import { SeatSelection } from '@/components/Seat';
+
+interface MobileBoardProps {
+  state: GameState;
+  activePlayer: PlayerState;
+  activeIdx: number;
+  selection: SeatSelection;
+  teamColorFor: (id: string) => { index: number | null; color: string | null };
+  opponents: { player: PlayerState; index: number }[];
+  onSelectHand: (idx: number) => void;
+  onSelectStock: () => void;
+  onSelectDiscard: (pileIdx: number) => void;
+  onClickBuildPile: (index: number) => void;
+  onClickOwnDiscardPile: (pileIdx: number) => void;
+}
+
+export default function MobileBoard({
+  state,
+  activePlayer,
+  activeIdx,
+  selection,
+  teamColorFor,
+  opponents,
+  onSelectHand,
+  onSelectStock,
+  onSelectDiscard,
+  onClickBuildPile,
+  onClickOwnDiscardPile,
+}: MobileBoardProps) {
+  const yourStockTop: CardType | null =
+    activePlayer.stockPile.length > 0
+      ? activePlayer.stockPile[activePlayer.stockPile.length - 1]
+      : null;
+  const activeTeam = teamColorFor(activePlayer.id);
+  const emptyLabel = state.config.bidirectionalBuild ? '1/12/W' : '1/W';
+
+  return (
+    <div className="md:hidden absolute inset-0 pt-[72px] pb-2 px-2 flex flex-col gap-2 overflow-y-auto">
+      {/* Opponents stack */}
+      <div className="flex flex-col gap-1.5">
+        {opponents.map(({ player, index }) => {
+          const team = teamColorFor(player.id);
+          return (
+            <MobileOpponentStrip
+              key={player.id}
+              player={player}
+              teamIndex={team.index}
+              teamColor={team.color}
+            />
+          );
+        })}
+      </div>
+
+      {/* Build row: your stock + 4 build piles */}
+      <div
+        className="relative rounded-lg px-2 py-2 flex items-start gap-2 justify-center"
+        style={{
+          background:
+            'radial-gradient(circle at 50% 35%, rgba(255,255,255,0.06), rgba(0,0,0,0.3))',
+          boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)',
+        }}
+      >
+        {/* Your stock — always present so you know what's on top */}
+        <div className="flex flex-col items-center gap-0.5 shrink-0">
+          {yourStockTop ? (
+            <DraggableCard
+              id={`stock-${activeIdx}`}
+              source={{ from: 'stock', playerIndex: activeIdx }}
+              card={yourStockTop}
+              size="md"
+              highlighted={selection.kind === 'stock'}
+              onClick={onSelectStock}
+              stacked={activePlayer.stockPile.length}
+            />
+          ) : (
+            <Card card={null} size="md" label="empty" />
+          )}
+          <span className="text-[9px] text-white/70 tracking-widest whitespace-nowrap">
+            STOCK · {activePlayer.stockPile.length}
+          </span>
+        </div>
+
+        <div className="w-px self-stretch bg-white/10 mx-1" />
+
+        {/* Build piles */}
+        <div className="flex items-start gap-1">
+          {state.buildPiles.map((pile, i) => {
+            const top = pile.cards[pile.cards.length - 1] ?? null;
+            const sub =
+              pile.cards.length === 0
+                ? emptyLabel
+                : `${pile.direction === 'asc' ? '↑' : '↓'}${pile.cards.length}`;
+            return (
+              <DroppableZone
+                key={i}
+                id={`build-${i}`}
+                data={{ kind: 'build', index: i }}
+                className="flex flex-col items-center gap-0.5"
+              >
+                <Card
+                  card={top}
+                  size="md"
+                  stacked={pile.cards.length}
+                  onClick={() => onClickBuildPile(i)}
+                />
+                <span className="text-[9px] text-white/70 whitespace-nowrap">{sub}</span>
+              </DroppableZone>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Your hand — always fully visible */}
+      <div
+        className="rounded-lg px-2 py-2 flex flex-col items-center gap-1"
+        style={{
+          background: 'rgba(0, 0, 0, 0.35)',
+          boxShadow: activeTeam.color
+            ? `inset 0 2px 0 0 ${activeTeam.color}, inset 0 0 0 1px rgba(255,255,255,0.05)`
+            : 'inset 0 0 0 1px rgba(255,255,255,0.05)',
+        }}
+      >
+        <div className="flex items-center justify-between w-full">
+          <span className="text-[11px] font-semibold text-white">
+            {activePlayer.name}
+            <span className="text-[var(--gold)] ml-1">· your turn</span>
+          </span>
+          <span className="text-[9px] text-white/60 uppercase tracking-wider">
+            HAND · {activePlayer.hand.length}
+          </span>
+        </div>
+        <div className="flex gap-1 justify-center flex-wrap">
+          {activePlayer.hand.length === 0 && (
+            <div className="text-xs text-white/40 italic py-4">empty hand</div>
+          )}
+          {activePlayer.hand.map((c, i) => (
+            <DraggableCard
+              key={c.id}
+              id={`hand-${activeIdx}-${i}`}
+              source={{ from: 'hand', index: i }}
+              card={c}
+              size="md"
+              highlighted={selection.kind === 'hand' && selection.index === i}
+              onClick={() => onSelectHand(i)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Your discard piles — drop targets + sources */}
+      <div className="rounded-lg px-2 py-2 flex flex-col items-center gap-1 bg-black/30 ring-1 ring-white/5">
+        <span className="text-[9px] text-white/60 uppercase tracking-wider w-full">
+          DISCARD
+        </span>
+        <div className="flex gap-1 justify-center w-full">
+          {activePlayer.discardPiles.map((pile, i) => {
+            const top = pile[pile.length - 1] ?? null;
+            const isSelected = selection.kind === 'discard' && selection.pileIndex === i;
+            const card = top ? (
+              <DraggableCard
+                id={`discard-src-${activeIdx}-${i}`}
+                source={{ from: 'discard', playerIndex: activeIdx, pileIndex: i }}
+                disabled={selection.kind === 'hand'}
+                card={top}
+                size="md"
+                highlighted={isSelected}
+                stacked={pile.length}
+                onClick={() => {
+                  if (selection.kind === 'hand') onClickOwnDiscardPile(i);
+                  else onSelectDiscard(i);
+                }}
+              />
+            ) : (
+              <Card
+                card={null}
+                size="md"
+                onClick={() => {
+                  if (selection.kind === 'hand') onClickOwnDiscardPile(i);
+                }}
+              />
+            );
+            return (
+              <div key={i} className="flex flex-col items-center gap-0.5">
+                <DroppableZone
+                  id={`discard-target-${activeIdx}-${i}`}
+                  data={{ kind: 'discard', index: i }}
+                >
+                  {card}
+                </DroppableZone>
+                <span className="text-[9px] text-white/50">{pile.length}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
