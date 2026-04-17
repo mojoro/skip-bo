@@ -2,6 +2,7 @@
 
 import Card from '@/components/Card';
 import DraggableCard from '@/components/DraggableCard';
+import DroppableZone from '@/components/DroppableZone';
 import { Card as CardType, PlayerState } from '@/lib/game/types';
 import { SeatPosition } from '@/lib/layout/seating';
 
@@ -174,28 +175,33 @@ export default function Seat({
                         }
                       }
                     : undefined;
+                  const card = top ? (
+                    <DraggableCard
+                      id={`discard-src-${playerIndex}-${i}`}
+                      data={{
+                        source: { from: 'discard', playerIndex, pileIndex: i },
+                      }}
+                      disabled={!isActive || selection.kind === 'hand'}
+                      card={top}
+                      size="sm"
+                      highlighted={isSelected}
+                      stacked={pile.length}
+                      onClick={handleClick}
+                    />
+                  ) : (
+                    <Card card={null} size="sm" label="" onClick={handleClick} />
+                  );
                   return (
                     <div key={i} className="flex flex-col items-center gap-0.5">
-                      {top ? (
-                        <DraggableCard
-                          id={`discard-src-${playerIndex}-${i}`}
-                          data={{
-                            source: { from: 'discard', playerIndex, pileIndex: i },
-                          }}
-                          disabled={!isActive || selection.kind === 'hand'}
-                          card={top}
-                          size="sm"
-                          highlighted={isSelected}
-                          stacked={pile.length}
-                          onClick={handleClick}
-                        />
+                      {isActive ? (
+                        <DroppableZone
+                          id={`discard-target-${playerIndex}-${i}`}
+                          data={{ kind: 'discard', index: i }}
+                        >
+                          {card}
+                        </DroppableZone>
                       ) : (
-                        <Card
-                          card={null}
-                          size="sm"
-                          label=""
-                          onClick={handleClick}
-                        />
+                        card
                       )}
                       <span className="text-[9px] text-white/50">{pile.length}</span>
                     </div>
