@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import NewGameModal, {
   NewGameSettings,
   buildPartnershipFromSettings,
@@ -12,6 +13,13 @@ import TableCenter from '@/components/TableCenter';
 import { applyAction, createGame } from '@/lib/game/engine';
 import { CardSource, GameAction, GameState, WILD } from '@/lib/game/types';
 import { getSeatPositions } from '@/lib/layout/seating';
+
+interface PendingDiscard {
+  handIndex: number;
+  discardPileIndex: number;
+  targetPlayerIndex: number;
+  cardLabel: string;
+}
 
 const TEAM_COLORS = [
   '#eab308', // amber
@@ -52,6 +60,7 @@ export default function Home() {
   const [message, setMessage] = useState<string>('');
   const [newGameOpen, setNewGameOpen] = useState(false);
   const [rulesetOpen, setRulesetOpen] = useState(false);
+  const [pendingDiscard, setPendingDiscard] = useState<PendingDiscard | null>(null);
 
   const players = state.players;
   const activeIdx = state.currentPlayerIndex;
@@ -141,12 +150,25 @@ export default function Home() {
       setMessage('select a hand card to discard');
       return;
     }
-    dispatch({
-      type: 'DISCARD',
+    const card = activePlayer.hand[selection.index];
+    if (!card) return;
+    setPendingDiscard({
       handIndex: selection.index,
       discardPileIndex: pileIndex,
       targetPlayerIndex: activeIdx,
+      cardLabel: card.value === WILD ? 'Skip-Bo (wild)' : String(card.value),
     });
+  };
+
+  const confirmPendingDiscard = () => {
+    if (!pendingDiscard) return;
+    dispatch({
+      type: 'DISCARD',
+      handIndex: pendingDiscard.handIndex,
+      discardPileIndex: pendingDiscard.discardPileIndex,
+      targetPlayerIndex: pendingDiscard.targetPlayerIndex,
+    });
+    setPendingDiscard(null);
   };
 
   const partnershipActive = !!state.config.partnership?.enabled;
@@ -274,6 +296,23 @@ export default function Home() {
         onClose={() => setRulesetOpen(false)}
         config={state.config}
         playerNames={players.map((p) => p.name)}
+      />
+      <ConfirmDialog
+        open={!!pendingDiscard}
+        title="End your turn?"
+        body={
+          pendingDiscard && (
+            <span>
+              Discard your {pendingDiscard.cardLabel} onto pile{' '}
+              {pendingDiscard.discardPileIndex + 1} and pass to the next player.
+            </span>
+          )
+        }
+        confirmLabel="Discard & end turn"
+        cancelLabel="Keep playing"
+        destructive
+        onConfirm={confirmPendingDiscard}
+        onCancel={() => setPendingDiscard(null)}
       />
     </div>
   );
