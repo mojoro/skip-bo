@@ -247,6 +247,9 @@ function Board({ state, setState }: BoardProps) {
   };
 
   const partnershipActive = !!state.config.partnership?.enabled;
+  // Desktop tabletop layout only works for small tables; anything larger degrades
+  // to the compact stacked layout so seats don't overlap.
+  const useTableLayout = players.length <= 4;
 
   return (
     <DragDropProvider onDragEnd={onDragEnd}>
@@ -258,9 +261,9 @@ function Board({ state, setState }: BoardProps) {
             SKIP<span className="text-[var(--gold)]">·</span>BO
           </h1>
 
-          {/* Status — desktop only, center of header */}
+          {/* Status — desktop tabletop only (5+ players use the floating ribbon below) */}
           <div
-            className="hidden md:block px-3 py-1 rounded-full border border-white/10 text-xs text-white/90 text-center mx-4 truncate max-w-xl"
+            className={`${useTableLayout ? 'hidden md:block' : 'hidden'} px-3 py-1 rounded-full border border-white/10 text-xs text-white/90 text-center mx-4 truncate max-w-xl`}
             style={{ background: 'rgba(0,0,0,0.45)' }}
           >
             {state.phase === 'finished' ? (
@@ -308,8 +311,8 @@ function Board({ state, setState }: BoardProps) {
           </div>
         </header>
 
-        {/* Status ribbon — mobile only, full-width below header */}
-        <div className="md:hidden absolute top-10 left-2 right-2 z-10 flex justify-center pointer-events-none">
+        {/* Status ribbon — shown on mobile OR whenever we fall back to the compact layout on desktop */}
+        <div className={`${useTableLayout ? 'md:hidden' : ''} absolute top-10 left-2 right-2 z-10 flex justify-center pointer-events-none`}>
           <div
             className="px-3 py-1 rounded-full border border-white/10 text-[11px] text-white backdrop-blur-sm text-center"
             style={{ background: 'rgba(0,0,0,0.45)' }}
@@ -332,7 +335,8 @@ function Board({ state, setState }: BoardProps) {
           </div>
         </div>
 
-        {/* Desktop: absolute seats around the table center */}
+        {/* Desktop tabletop — 2..4 players only; 5+ falls through to MobileBoard */}
+        {useTableLayout && (
         <div className="hidden md:contents">
           <TableCenter
             buildPiles={state.buildPiles}
@@ -384,8 +388,10 @@ function Board({ state, setState }: BoardProps) {
             );
           })}
         </div>
+        )}
 
-        {/* Mobile: custom compact layout — see MobileBoard component */}
+        {/* Compact layout — mobile always, desktop when > 4 players */}
+        <div className={useTableLayout ? 'md:hidden contents' : 'contents'}>
         <MobileBoard
           state={state}
           activePlayer={activePlayer}
@@ -419,6 +425,7 @@ function Board({ state, setState }: BoardProps) {
           onClickBuildPile={onClickBuildPile}
           onClickOwnDiscardPile={onClickOwnDiscardPile}
         />
+        </div>
       </div>
 
       <NewGameModal
