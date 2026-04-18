@@ -1,12 +1,13 @@
 # Game WebSocket audit — findings and fixes
 
-Three audit passes were run against the Section 3 game-websocket implementation on branch `game-websocket`. This document captures every finding and its resolution so future sessions have the full reasoning trail.
+Four audit passes were run against the Section 3 game-websocket implementation on branch `game-websocket`. This document captures every finding and its resolution so future sessions have the full reasoning trail.
 
 - **Audit 1 (first-principles):** walked the new code against the plan, looked for obvious bugs, security gaps, and perf smells.
 - **Audit 2 (doc-grounded):** cross-referenced the code against the `ws@8` README, Node.js timers docs, pino flush docs, and React effect semantics.
 - **Audit 3 (boundary-crossing):** re-walked the same code after audits 1 and 2 shipped, focused on the engine→wire trust boundary, the shutdown ordering, and the Manager↔WS gap that was deferred. Found the two game-breaking leaks the earlier passes missed.
+- **Audit 4 (fresh-reviewer pass):** dispatched after audits 1–3 shipped, with full context of prior findings. Verified every audit-1/2/3 claim against the code (all held except C1's scope), pressure-tested the duplicate-session lifecycle, and found a Critical state-corruption bug the regression tests were blind to.
 
-All three audits are included. Items are labeled with their original identifier so commits and review history can be traced. "Earlier audit" = audit 1. "Doc audit" = audit 2. "Third audit" = audit 3.
+All four audits are included. Items are labeled with their original identifier so commits and review history can be traced. "Earlier audit" = audit 1. "Doc audit" = audit 2. "Third audit" = audit 3. "Fourth audit" = audit 4.
 
 ## Commit trail
 
@@ -54,7 +55,22 @@ Every fix is an atomic commit on `game-websocket`. Relevant commits in order:
 | `29859bb` | Parse the upgrade request URL against a fixed base instead of Host (third #V) |
 | `96f8615` | Narrow the upgrade socket to net.Socket to reach remoteAddress (follow-up to third #M) |
 
-Final test state after all three audits: **server suite 110/110, client suite 64/64, server typecheck clean.**
+Audit-4 additions (this pass):
+
+| Commit (planned) | Fix |
+|---|---|
+| audit-4 #C1 | Gate handleClose slot mutation on sessionId + registry ownership |
+| audit-4 #I1 | Raw-TCP Upgrade test asserting 403 on mismatched Origin |
+| audit-4 #I2 | Full-flow tests for grace→bot takeover and finishGame→4005 |
+| audit-4 #I4 | Remove dead 150 ms setTimeout in onAfterCommit game-end path |
+| audit-4 #I5 | onMemberDisplaced internal event + subscriber closes 4002 |
+| audit-4 #I6 | Sync sweepSocketsSync sending 1011 before uncaught exit |
+| audit-4 #M1 | Explicit callback types in view.ts and mapping.ts for root tsc |
+| audit-4 #M3 | Add 1003, 1009 to client TERMINAL_CLOSE_CODES |
+| audit-4 #M5 | Snapshot rooms Map entries before iterating in broadcastCloseAll |
+| audit-4 #M6 | Ratchet test for mixed [human, locked, human, ai] seat layout |
+
+Final test state after all four audits: **server suite 115/115, client suite 64/64, server typecheck clean.**
 
 ---
 
@@ -526,3 +542,125 @@ Only pathname + searchParams were read today. Pinning the base to a fixed placeh
 - Tests that manually clean up shared resources before teardown mask ordering bugs in the teardown path. Add at least one teardown-with-live-state case per subsystem that owns async cleanup.
 - "Not blocking" deferrals have cumulative cost. The #L private-room leak, the #F URL query, and the #E ghost-seat were all flagged as "probably fine for v1" by earlier passes; together they meant a private-room playing game could silently stall, leak sockets, and hand sessionIds to the nginx log all in the same deployment.
 - The single best cheap defense against this class of leak is a ratchet test: `expect(JSON.stringify(view)).not.toContain(secret)`. The seed leak had been shipped to main before the third audit caught it and the regression test went in.
+
+---
+
+# Audit 4 — fresh-reviewer pass
+
+A fresh reviewer ran after audits 1–3 shipped, with explicit context that Codex had run three self-audits. The brief: verify every prior claim against the code (don't trust the doc), then pressure-test beyond it. Outcome:
+
+- **35+ prior claims checked.** All held except one — audit-1 C1's scope was partial. See C1 below.
+- **One new Critical** (C1 below): duplicate-session reconnect stomped live slot state. Regression reproducer landed.
+- **Test gaps surfaced** for the single defenses that were untested (origin check, grace→bot pipeline, gameEnded→4005).
+- **Two dead-code duplications** and one missing test helper surfaced as cheap wins.
+
+## Critical
+
+### #C1 (audit-4) — handleClose stomps live connection's slot state after duplicate-session eviction
+
+**File:** `server/src/game/connection.ts:222-248`
+
+**What was wrong.** Audit-1 C1 decoupled `handleClose` cleanup from the `close()` guard via `this.cleanedUp`, and audit-1 I3 made duplicate-session eviction synchronous at the registry. Neither prevented the stale connection from mutating slot state on its own `'close'` event. The sequence:
+
+1. Second connection for the same sessionId arrives.
+2. Handshake sync: `registry.remove(existing)` + `existing.close(4004, 'duplicate session')`.
+3. `wss.handleUpgrade(...)` sync: new `GameConnection.attach()` runs → `slot.connected = true`, `cancelGrace`, `registry.add(new)`.
+4. Event loop turn ticks — old socket's `'close'` event fires.
+5. Old conn's `handleClose` runs with no ownership check. Unconditionally `slot.connected = false`, `startGrace(...)`, `broadcastState()` — stomping the live connection's slot state and arming a 60 s grace timer against an open socket.
+
+**Reviewer verified with a 30-line vitest reproducer.** Slot ended with `connected: false` and `graceDeadline` set; the live reconnected user was then refused every action by `dispatch.ts:77-89` because `slot.connected === false` trips `notConnected`. The reconnected tab became a dead tab.
+
+**Fix.** Two-gate ownership check before the slot mutation:
+```ts
+const slot = this.room.slots[this.slotIndex];
+if (!slot || slot.kind !== 'human' || slot.sessionId !== this.sessionId) return;
+if (this.registry.findBySession(this.room.id, this.sessionId) !== undefined) return;
+slot.connected = false;
+// ... arm grace, broadcast
+```
+
+The `sessionId` match rules out a slot already displaced by `setSlot`. The `findBySession` check rules out the duplicate-session race: if a newer connection is registered for this sessionId, we're the stale one — exit quietly.
+
+**Regression:** `server/tests/game/handshake.test.ts` — "stale close after duplicate-session kick leaves live slot state intact". Reviewer-authored reproducer confirmed to fail on the un-guarded code and pass with the guard.
+
+## Important
+
+### #I1 (audit-4) — no test for the origin-check CSWSH defense
+
+**File:** `server/tests/game/handshake.test.ts`
+
+Pre-audit-4, zero tests covered the `handshake.ts:75-79` origin check. Browser `new WebSocket(...)` locks the Origin header to the page origin, so unit tests built on the `ws` client couldn't spoof it. Added a raw TCP Upgrade test that writes an HTTP/1.1 handshake request with a deliberately-wrong Origin and asserts the `HTTP/1.1 403 Forbidden\r\n\r\n` line the `bail` helper writes back.
+
+### #I2 (audit-4) — fullFlow coverage only exercised the happy path
+
+**Files:** `server/tests/game/fullFlow.test.ts`, `server/src/game/grace.ts`
+
+Pre-audit-4, `fullFlow.test.ts` had one scenario — chat + disconnect-and-reconnect-before-grace. The grace→bot pipeline, the `roomClosed` → 4005 close-all path, and the `onAfterCommit` game-end flow were only tested piecewise in unit tests (`grace.test.ts`, `bot.test.ts`). Added:
+
+- **grace→bot takeover:** client disconnects → wait for peer `state` with `botControlled: true` → wait for peer `state` with bumped `stateVersion` (bot played).
+- **finishGame → 4005:** call `manager.finishGame(roomId, 'winner')` with both sockets attached → both receive close 4005.
+
+Required a test-only `__setGraceMsForTest(ms)` helper in `grace.ts` so the integration test can run the 60 s production window on a 150 ms budget. Production paths never touch the override — it's a `null` sentinel read inside `currentGraceMs()`, with an `afterEach` reset in the test file.
+
+### #I4 (audit-4) — redundant close path on game-end
+
+**File:** `server/src/game/connection.ts:183-199`
+
+After audit-3 #L wired the `roomClosed` subscriber (which fires on `finishGame` → closes every game socket with 4005), the 150 ms `setTimeout` that `onAfterCommit` used for its fallback 4005 close became dead code. Both paths fired after every winning move, with the subscriber reliably beating the timer and leaving the timer to iterate an already-empty registry. Removed the timer; the `ws` library serializes the in-flight `gameEnded` frame before the close frame, so clients still receive both in order.
+
+### #I5 (audit-4) — setSlot human-displacement has no WS cleanup wiring
+
+**Files:** `server/src/room/manager.ts`, `server/src/index.ts`
+
+`setSlot` is gated to `phase === 'waiting'` and the handshake rejects pre-playing rooms with 4006, so no live `GameConnection` should exist at displacement time today. But that makes displacement cleanup a load-bearing invariant of the handshake gate — one that isn't documented and won't survive a future change that opens WS during lobby chat.
+
+Added `RoomManager.onMemberDisplaced(handler)` as a typed subscription on the existing internal `EventEmitter`. `setSlot` emits `memberDisplaced` on any `human → open/ai/locked` transition (co-located with the existing `sessionIndex.delete` + `kickedSessionIds.add`). `server/src/index.ts` subscribes: look up the session's live `GameConnection` and close it with 4002 `'kicked'`. Belt-and-suspenders — if displacement ever happens with a live socket, the socket closes deterministically instead of lingering.
+
+### #I6 (audit-4) — `uncaughtException` left sockets on a 1006 close
+
+**File:** `server/src/shutdown.ts:60-75`
+
+Audit-2 doc #13 correctly changed the `uncaughtException` / `unhandledRejection` handlers to synchronous (Node's explicit guidance). But with no socket sweep before `onExit(1)`, the process tore down TCP sockets without sending a close frame — every client saw 1006 (abnormal close), indistinguishable from a network flap. Added a synchronous `sweepSocketsSync()` that iterates `gameRegistry.allConnections()` and calls `conn.close(1011, 'server error')` on each. `ws.close()` queues the close frame into the outbound TCP buffer synchronously, so typically the bytes land before the process dies — clients see 1011 and know the server crashed.
+
+## Minor
+
+### #M1 (audit-4) — implicit-any under root tsc
+
+**Files:** `server/src/game/view.ts`, `server/src/game/mapping.ts`
+
+Follow-up #13 in `CLAUDE.md` notes that the repo-root `tsconfig.json` picks up `server/` files without the `@engine/*` path alias (which lives in `server/tsconfig.json`). Under root tsc, the engine imports fail to resolve and every downstream type collapses to `any`, which in turn trips `noImplicitAny` on callback parameters. Added explicit types to the three callbacks in `view.ts:66-67` (`partnership.teams.map((team: string[]) => team.map((id: string) => ...))`) and `mapping.ts:15` (`players.findIndex((p: { id: string }) => ...)`). Root tsc now only reports the pre-existing `@engine/*` TS2307 errors; no implicit-any cascade on new files.
+
+Proper fix still deferred to follow-up #13 (teach root tsconfig the alias, or exclude `server/**`).
+
+### #M3 (audit-4) — 1003 and 1009 missing from client TERMINAL_CLOSE_CODES
+
+**File:** `src/lib/net/protocol.ts`
+
+A buggy client that sends binary frames gets a 1003, reconnects, sends another binary frame, gets another 1003 — kick loop. Same shape for 1009 (message too large). Not an attacker primitive (the server still kicks), but wastes a full handshake round-trip on every retry. Added both to `TERMINAL_CLOSE_CODES` with a comment explaining the pattern.
+
+### #M5 (audit-4) — `broadcastCloseAll` mutated `rooms` Map during iteration
+
+**File:** `server/src/game/registry.ts:44-53`
+
+Audit-2 doc #7 fixed this exact pattern in `forEachInRoom` (snapshot via `[...set]` before iterating). `broadcastCloseAll` was still iterating the Map directly with inline `this.rooms.delete(roomId)`. ECMAScript Map iterator semantics make this safe today (already-yielded entries aren't affected), but a sync close handler could re-enter and add a new entry mid-iteration. Snapshot entries up front, clear the map, then iterate. Same pattern as the `forEachInRoom` fix.
+
+### #M6 (audit-4) — view ratchet test only ran the 2-player partnership layout
+
+**File:** `server/tests/game/view.test.ts`
+
+The audit-3 A1/A2/A3 keystone test `expect(JSON.stringify(view)).not.toContain(secret)` was the single cheapest defense against regression. It only ran on a `[human, human]` partnership layout, which exercises a narrow slice of the mapping layer. Added a parallel test with `[human, locked, human, ai]` at `maxPlayers: 4` — same `JSON.stringify` ratchet, verified for two distinct viewers (Alice at slot 0, Carol at slot 2), plus `youSlotIndex` round-trip. Non-trivial player indices and non-human middle seats now covered.
+
+## Deferred
+
+Not part of this pass; still open:
+
+- **Minor M-2** (reviewer): `server/src/game/connection.ts` logs include `sessionId` on every attach/detach/rate-limit/action-error event. If logs ship to a third party (pm2, docker, log aggregator), sessionIds leak there even with the wire view scrubbed. Already acknowledged as deferred to Section 7 in audit-3 #F.
+- **Minor M-7** (reviewer): no React-level test driving `useGameSocket` through mount/unmount/visibility/close cycles. Test gap but not a bug — the bulk of hook logic is already covered by `computeReconnectDelay` and `shouldReconnect` unit tests.
+- **Minor M-8** (reviewer): chat sanitizer in `dispatch.ts:19-21` still doesn't strip C1 control chars / U+2028/U+2029 / zero-width. Safe because no client path renders chat via `dangerouslySetInnerHTML`. Acknowledged in audit-1 and here; defer to a future hardening step.
+
+## Lessons (audit 4)
+
+- **"LLM self-audit docs describe what the LLM claims to have fixed, not what the code does."** 35+ claims in this doc were verifiable — all held — but the one exception (C1's scope) was the live Critical. Fresh reviewers must verify, not trust.
+- **Regression tests for the single defense.** Origin check, grace→bot pipeline, gameEnded→4005 were all single-defense code paths with zero coverage until audit-4 added them. The ratchet test from audit-3 was the cheapest high-ROI defense added in the whole branch; audit-4 extended the same pattern.
+- **Dead-code duplications stack up.** Once audit-3 #L wired `roomClosed` → 4005, the earlier `onAfterCommit` setTimeout became strictly dead. Deleting it was cheap; leaving it invited a future "which 4005 close wins?" bug when the subscriber is refactored.
+- **Test-only helpers are cheap when the alternative is real-time.** Production grace is 60 s; a unit test that waits 60 s is unshippable. `__setGraceMsForTest(ms)` is a 5-line module override that unblocks integration testing without threading DI through every call site. Acceptable because the override is `null` by default and production reads `currentGraceMs()` uniformly.
