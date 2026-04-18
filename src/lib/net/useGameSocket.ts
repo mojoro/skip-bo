@@ -95,11 +95,20 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
   useEffect(() => {
     connect();
     const onVisible = () => {
-      if (document.visibilityState === 'visible' && wsRef.current?.readyState !== WebSocket.OPEN) {
-        if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null; }
-        attemptRef.current = 0;
-        connect();
+      if (document.visibilityState !== 'visible') return;
+      if (wsRef.current?.readyState === WebSocket.OPEN) return;
+      if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null; }
+      const stale = wsRef.current;
+      wsRef.current = null;
+      if (stale) {
+        stale.onopen = null;
+        stale.onmessage = null;
+        stale.onclose = null;
+        stale.onerror = null;
+        try { stale.close(1000); } catch { /* ignore */ }
       }
+      attemptRef.current = 0;
+      connect();
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
