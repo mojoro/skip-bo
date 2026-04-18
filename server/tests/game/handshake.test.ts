@@ -30,20 +30,20 @@ async function startHarness(corsOrigin = '*'): Promise<Harness> {
   };
 }
 
-async function startGameAndGetRoomId(h: Harness): Promise<{ roomId: string; host: string; guest: string }> {
+async function startGameAndGetRoomId(h: Harness, bearers: { host: string; guest: string } = { host: 'host', guest: 'guest' }): Promise<{ roomId: string; host: string; guest: string }> {
   const create = await fetch(`${h.base}/v1/rooms`, {
     method: 'POST',
-    headers: { authorization: 'Bearer host', 'content-type': 'application/json' },
+    headers: { authorization: `Bearer ${bearers.host}`, 'content-type': 'application/json' },
     body: JSON.stringify({ playerName: 'Host', config: { ruleset: 'recommended', stockPileSize: 10, handSize: 5, bidirectionalBuild: true, maxPlayers: 2, partnership: null }, allowAiFill: false, visibility: 'public' }),
   });
   const { roomId } = (await create.json()) as { roomId: string };
   await fetch(`${h.base}/v1/rooms/${roomId}/members`, {
     method: 'POST',
-    headers: { authorization: 'Bearer guest', 'content-type': 'application/json' },
+    headers: { authorization: `Bearer ${bearers.guest}`, 'content-type': 'application/json' },
     body: JSON.stringify({ playerName: 'Guest' }),
   });
-  await fetch(`${h.base}/v1/rooms/${roomId}/game`, { method: 'POST', headers: { authorization: 'Bearer host' } });
-  return { roomId, host: 'host', guest: 'guest' };
+  await fetch(`${h.base}/v1/rooms/${roomId}/game`, { method: 'POST', headers: { authorization: `Bearer ${bearers.host}` } });
+  return { roomId, host: bearers.host, guest: bearers.guest };
 }
 
 async function waitForMessage(ws: WebSocket, timeoutMs = 2000): Promise<unknown> {
@@ -147,4 +147,32 @@ describe('game ws handshake', () => {
     expect(status).toMatch(/^HTTP\/1\.1 403/);
   });
 
+  it('stale close after duplicate-session kick leaves live slot state intact', async () => {
+    // Regression for C-1: before the ownership guard in handleClose, the
+    // evicted connection's close event fired AFTER the new connection had
+    // already attached and flipped slot.connected = true. handleClose would
+    // then unconditionally set connected = false and arm a 60s grace timer
+    // against the live socket.
+    h = await startHarness();
+    // Module-level createRoom rate limiter keyed on bearer is shared across
+    // tests (CLAUDE.md follow-up #9). Use distinct bearers so this 6th test
+    // doesn't starve the createRoom bucket already spent by siblings.
+    const { roomId, host } = await startGameAndGetRoomId(h, { host: 'stale-host', guest: 'stale-guest' });
+    const first = new WebSocket(`${h.wsBase}/rooms/${roomId}/game?sessionId=${host}`);
+    await waitForMessage(first);
+    const second = new WebSocket(`${h.wsBase}/rooms/${roomId}/game?sessionId=${host}`);
+    await waitForMessage(second);
+    await waitForClose(first); // 4004
+    // Let the event loop flush any straggler work the evicted conn queued.
+    await new Promise((r) => setTimeout(r, 50));
+    const room = h.mgr.get(roomId)!;
+    const slot = room.slots[0];
+    expect(slot?.kind).toBe('human');
+    if (slot?.kind === 'human') {
+      expect(slot.connected).toBe(true);
+      expect(slot.graceDeadline).toBeNull();
+      expect(slot.graceTimer).toBeNull();
+    }
+    second.close();
+  });
 });
