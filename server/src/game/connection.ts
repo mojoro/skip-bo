@@ -97,7 +97,7 @@ export class GameConnection implements RegisteredConnection {
     this.broadcastState();
     this.startHeartbeat();
 
-    this.ws.on('message', (raw) => this.handleMessage(raw));
+    this.ws.on('message', (raw, isBinary) => this.handleMessage(raw, isBinary));
     this.ws.on('pong', () => { this.isAlive = true; });
     this.ws.on('close', (code, reason) => this.handleClose(code, reason.toString()));
   }
@@ -128,15 +128,18 @@ export class GameConnection implements RegisteredConnection {
     this.registry.broadcast(this.room.id, chat);
   }
 
-  private handleMessage(raw: unknown): void {
+  private handleMessage(raw: unknown, isBinary: boolean): void {
     if (!takeToken(this.msgBucket, MSG_RATE_LIMIT)) {
       this.log.warn({ sessionId: this.sessionId }, 'rateLimit');
       this.close(1008, 'rate limit');
       return;
     }
+    if (isBinary) { this.close(1003, 'binary not supported'); return; }
     let text: string;
     if (typeof raw === 'string') text = raw;
-    else if (raw instanceof Buffer) text = raw.toString('utf-8');
+    else if (Buffer.isBuffer(raw)) text = raw.toString('utf-8');
+    else if (Array.isArray(raw)) text = Buffer.concat(raw as Buffer[]).toString('utf-8');
+    else if (raw instanceof ArrayBuffer) text = Buffer.from(raw).toString('utf-8');
     else { this.close(1008, 'bad frame'); return; }
     let parsed: unknown;
     try { parsed = JSON.parse(text); } catch { this.close(1008, 'bad json'); return; }
