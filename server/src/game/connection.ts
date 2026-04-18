@@ -66,7 +66,13 @@ export class GameConnection implements RegisteredConnection {
       this.close(1008, 'slow consumer');
       return;
     }
-    try { this.ws.send(JSON.stringify(message)); } catch { /* ignore — socket closed mid-send */ }
+    try {
+      this.ws.send(JSON.stringify(message), (err) => {
+        if (!err) return;
+        this.log.warn({ err, sessionId: this.sessionId }, 'sendError');
+        try { this.ws.terminate(); } catch { /* ignore */ }
+      });
+    } catch { /* synchronous throw — socket closed mid-send */ }
   }
 
   close(code: number, reason: string): void {
