@@ -1,5 +1,6 @@
 import type { PlayerView } from '@engine/engine';
 import { getPlayerView } from '@engine/engine';
+import type { GameConfig } from '@engine/types';
 import type { Room, Slot } from '../types';
 
 export interface GameViewSeat {
@@ -11,9 +12,22 @@ export interface GameViewSeat {
   botControlled: boolean;
 }
 
+export type PublicGameConfig = Omit<GameConfig, 'seed'>;
+
+export type PublicPlayerView = Omit<PlayerView, 'config'> & {
+  config: PublicGameConfig;
+};
+
 export interface GameView {
-  view: PlayerView;
+  view: PublicPlayerView;
   seats: GameViewSeat[];
+}
+
+function stripSeed(config: GameConfig): PublicGameConfig {
+  // `config.seed` deterministically drives shuffle + per-action RNG. Exposing it
+  // to any connected client lets them reconstruct every opponent's hidden state.
+  const { seed: _seed, ...rest } = config;
+  return rest;
 }
 
 export function buildSeats(room: Room): GameViewSeat[] {
@@ -61,6 +75,7 @@ export function buildSeats(room: Room): GameViewSeat[] {
 
 export function buildGameView(room: Room, sessionId: string, seats?: GameViewSeat[]): GameView {
   if (!room.game) throw new Error('buildGameView: room has no game');
-  const view = getPlayerView(room.game, sessionId);
+  const raw = getPlayerView(room.game, sessionId);
+  const view: PublicPlayerView = { ...raw, config: stripSeed(raw.config) };
   return { view, seats: seats ?? buildSeats(room) };
 }

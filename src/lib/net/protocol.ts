@@ -1,4 +1,4 @@
-import type { GameAction, GameState, PlayerState, CardValue } from '@/lib/game/types';
+import type { GameAction, GameConfig, GameState, PlayerState, CardValue } from '@/lib/game/types';
 
 export interface OpponentView {
   id: string;
@@ -9,8 +9,13 @@ export interface OpponentView {
   discardPiles: { id: string; value: CardValue }[][];
 }
 
+// `seed` is stripped server-side: exposing it lets any client reconstruct the
+// full shuffled deck and every opponent's hidden hand / stock. See
+// `server/src/game/view.ts#stripSeed`.
+export type PublicGameConfig = Omit<GameConfig, 'seed'>;
+
 export interface PlayerView {
-  config: GameState['config'];
+  config: PublicGameConfig;
   phase: GameState['phase'];
   turnPhase: GameState['turnPhase'];
   currentPlayerIndex: number;
