@@ -27,6 +27,14 @@ function main(): void {
   roomManager.onRoomClosed((roomId) => {
     gameRegistry.forEachInRoom(roomId, (conn) => conn.close(4005, 'room closed'));
   });
+  // Host-driven displacement (setSlot human→open/ai/locked). Belt-and-
+  // suspenders: the handshake rejects pre-playing connections so there is
+  // nothing to close today, but if a future product change opens WS during
+  // waiting this keeps the kicked session from lingering on its socket.
+  roomManager.onMemberDisplaced((roomId, sessionId) => {
+    const conn = gameRegistry.findBySession(roomId, sessionId);
+    if (conn) conn.close(4002, 'kicked');
+  });
 
   const { httpServer, router } = buildHttpServer({
     roomManager,

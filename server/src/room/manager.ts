@@ -43,6 +43,18 @@ export class RoomManager {
     return () => this.internalEvents.off('roomClosed', handler);
   }
 
+  // Fires when a seated human is kicked out of their slot by the host via
+  // setSlot (human→open / human→ai / human→locked). The WS layer subscribes
+  // to close any live GameConnection the displaced session might still hold.
+  // Today the handshake blocks pre-playing connections, so no socket should
+  // exist at displacement time — but if the product ever opens WS during
+  // waiting for lobby chat, this keeps the invariant enforced at the event
+  // layer instead of by accident of routing.
+  onMemberDisplaced(handler: (roomId: string, sessionId: string) => void): () => void {
+    this.internalEvents.on('memberDisplaced', handler);
+    return () => this.internalEvents.off('memberDisplaced', handler);
+  }
+
   create(input: CreateRoomInput): { room: Room } {
     if (this.sessionIndex.has(input.sessionId)) {
       throw new RoomError('sessionAlreadySeated', `Session ${input.sessionId} is already seated in a room.`);
@@ -204,6 +216,7 @@ export class RoomManager {
     if (current.kind === 'human') {
       room.kickedSessionIds.add(current.sessionId);
       this.sessionIndex.delete(current.sessionId);
+      this.internalEvents.emit('memberDisplaced', room.id, current.sessionId);
     }
     if (desired.kind === 'ai') {
       room.slots[index] = {
