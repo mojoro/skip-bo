@@ -46,3 +46,6 @@ next-env.d.ts
 
 # Caveman compress backups
 *.original.md
+
+# Git worktrees
+.worktrees/
