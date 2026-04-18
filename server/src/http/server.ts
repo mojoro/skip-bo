@@ -11,6 +11,8 @@ import { postRoom, listRooms, getRoom, patchRoom } from './handlers/rooms';
 import { postMember, deleteMember } from './handlers/members';
 import { putSlot } from './handlers/slots';
 import { postGame } from './handlers/game';
+import { getLobbyStream } from './handlers/lobbyStream';
+import type { LobbyStreamRegistry } from '../sse/registry';
 
 export interface BuildOptions {
   roomManager: RoomManager;
@@ -55,7 +57,11 @@ export function buildHttpServer(opts: BuildOptions): BuiltServer {
   return { httpServer, router };
 }
 
-export function mountRoutes(router: Router, mgr: RoomManager): void {
+export function mountRoutes(
+  router: Router,
+  mgr: RoomManager,
+  extras: { registry?: LobbyStreamRegistry } = {},
+): void {
   router.add('GET', '/v1/rooms', listRooms(mgr));
   router.add('POST', '/v1/rooms', postRoom(mgr));
   router.add('GET', '/v1/rooms/:id', getRoom(mgr));
@@ -64,4 +70,7 @@ export function mountRoutes(router: Router, mgr: RoomManager): void {
   router.add('DELETE', '/v1/rooms/:id/members/:sessionId', deleteMember(mgr));
   router.add('PUT', '/v1/rooms/:id/slots/:index', putSlot(mgr));
   router.add('POST', '/v1/rooms/:id/game', postGame(mgr));
+  if (extras.registry) {
+    router.add('GET', '/v1/lobby/stream', getLobbyStream(mgr, extras.registry));
+  }
 }
