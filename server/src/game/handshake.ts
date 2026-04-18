@@ -41,35 +41,40 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): GameUpgradeHandle
 
   const handleUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
     socket.on('error', onSocketError);
-    if (shuttingDown) {
-      socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n');
+    // Abandon every early-exit path by removing the error listener we just
+    // attached. Leaving it on a destroyed socket is benign (GC eventually
+    // reaps) but it's an easy source of future leaks if the socket
+    // lifecycle changes.
+    const bail = (response?: string): void => {
+      if (response) socket.write(response);
+      socket.removeListener('error', onSocketError);
       socket.destroy();
+    };
+    if (shuttingDown) {
+      bail('HTTP/1.1 503 Service Unavailable\r\n\r\n');
       return;
     }
     const remote = socket.remoteAddress ?? 'unknown';
     if (!upgradeLimiter.take(remote)) {
       log.warn({ remote }, 'upgradeRateLimit');
-      socket.write('HTTP/1.1 429 Too Many Requests\r\nRetry-After: 10\r\n\r\n');
-      socket.destroy();
+      bail('HTTP/1.1 429 Too Many Requests\r\nRetry-After: 10\r\n\r\n');
       return;
     }
     try {
       const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
       const match = PATH_RE.exec(url.pathname);
-      if (!match) { socket.destroy(); return; }
+      if (!match) { bail(); return; }
       const roomId = decodeURIComponent(match[1]!);
 
       const origin = req.headers.origin;
       if (deps.corsOrigin !== '*' && (!origin || origin !== deps.corsOrigin)) {
-        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
-        socket.destroy();
+        bail('HTTP/1.1 403 Forbidden\r\n\r\n');
         return;
       }
 
       const sessionId = url.searchParams.get('sessionId');
       if (!sessionId) {
-        socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
-        socket.destroy();
+        bail('HTTP/1.1 400 Bad Request\r\n\r\n');
         return;
       }
 
@@ -121,7 +126,7 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): GameUpgradeHandle
       });
     } catch (err) {
       log.error({ err }, 'upgradeError');
-      try { socket.destroy(); } catch { /* ignore */ }
+      try { bail(); } catch { /* ignore */ }
     }
   };
 
