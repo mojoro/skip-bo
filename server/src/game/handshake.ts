@@ -6,6 +6,7 @@ import type { GameRegistry } from './registry';
 import { GameConnection } from './connection';
 import { MAX_MESSAGE_BYTES } from './protocol';
 import { logger } from '../logger';
+import { TokenBucketLimiter, LIMITS } from '../http/middleware/rateLimit';
 
 const PATH_RE = /^\/rooms\/([^/]+)\/game$/;
 
@@ -23,6 +24,10 @@ export interface GameUpgradeHandler {
 export function createGameUpgradeHandler(deps: HandshakeDeps): GameUpgradeHandler {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES });
   const log = logger.child({ component: 'gameWs.handshake' });
+  // Keyed on remote address — a session can legitimately reconnect (grace
+  // resume, tab refocus), but a single IP shouldn't be hammering out dozens
+  // of handshakes per second.
+  const upgradeLimiter = new TokenBucketLimiter(LIMITS.gameUpgrade);
   let shuttingDown = false;
 
   const onSocketError = (err: Error): void => {
@@ -38,6 +43,13 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): GameUpgradeHandle
     socket.on('error', onSocketError);
     if (shuttingDown) {
       socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    const remote = socket.remoteAddress ?? 'unknown';
+    if (!upgradeLimiter.take(remote)) {
+      log.warn({ remote }, 'upgradeRateLimit');
+      socket.write('HTTP/1.1 429 Too Many Requests\r\nRetry-After: 10\r\n\r\n');
       socket.destroy();
       return;
     }
