@@ -13,7 +13,8 @@ const HEARTBEAT_MS = 25_000;
 const HEARTBEAT_TIMEOUT_MS = 30_000;
 const BACKPRESSURE_LIMIT = 256 * 1024;
 const CHAT_RATE_LIMIT = { capacity: 5, refillPerMs: 5 / 10_000 };
-const MSG_RATE_LIMIT = { capacity: 20, refillPerMs: 10 / 1_000 };
+const MSG_RATE_LIMIT = { capacity: 10, refillPerMs: 5 / 1_000 };
+const ERROR_RATE_LIMIT = { capacity: 3, refillPerMs: 1 / 1_000 };
 
 function takeToken(bucket: { tokens: number; lastRefill: number }, cfg: { capacity: number; refillPerMs: number }): boolean {
   const now = Date.now();
@@ -47,6 +48,7 @@ export class GameConnection implements RegisteredConnection {
   private readonly log = logger.child({ component: 'gameWs' });
   private readonly msgBucket = { tokens: MSG_RATE_LIMIT.capacity, lastRefill: Date.now() };
   private readonly chatBucket = { tokens: CHAT_RATE_LIMIT.capacity, lastRefill: Date.now() };
+  private readonly errorBucket = { tokens: ERROR_RATE_LIMIT.capacity, lastRefill: Date.now() };
 
   constructor(deps: GameConnectionDeps) {
     this.ws = deps.ws;
@@ -141,6 +143,13 @@ export class GameConnection implements RegisteredConnection {
     const effects = dispatchMessage(this.room, this.sessionId, msg, { now: () => Date.now() });
     for (const e of effects) {
       if (e.kind === 'sendTo') {
+        if (e.message.type === 'actionError' && e.sessionId === this.sessionId) {
+          if (!takeToken(this.errorBucket, ERROR_RATE_LIMIT)) {
+            this.log.warn({ sessionId: this.sessionId }, 'errorRateLimit');
+            this.close(1008, 'too many illegal actions');
+            return;
+          }
+        }
         const conn = this.registry.findBySession(this.room.id, e.sessionId);
         if (conn) conn.send(e.message);
       } else if (e.kind === 'broadcastState') {
