@@ -10,7 +10,6 @@ import { maybeRunBotTurn } from './bot';
 import { logger } from '../logger';
 
 const HEARTBEAT_MS = 25_000;
-const HEARTBEAT_TIMEOUT_MS = 30_000;
 const BACKPRESSURE_LIMIT = 256 * 1024;
 const CHAT_RATE_LIMIT = { capacity: 5, refillPerMs: 5 / 10_000 };
 const MSG_RATE_LIMIT = { capacity: 10, refillPerMs: 5 / 1_000 };
@@ -42,7 +41,7 @@ export class GameConnection implements RegisteredConnection {
   private readonly manager: RoomManager;
   private readonly registry: GameRegistry;
   private heartbeatTimer: NodeJS.Timeout | null = null;
-  private heartbeatDeadline: NodeJS.Timeout | null = null;
+  private isAlive = true;
   private closed = false;
   private cleanedUp = false;
   private readonly log = logger.child({ component: 'gameWs' });
@@ -91,7 +90,7 @@ export class GameConnection implements RegisteredConnection {
     this.startHeartbeat();
 
     this.ws.on('message', (raw) => this.handleMessage(raw));
-    this.ws.on('pong', () => this.refreshHeartbeatDeadline());
+    this.ws.on('pong', () => { this.isAlive = true; });
     this.ws.on('close', (code, reason) => this.handleClose(code, reason.toString()));
     this.ws.on('error', (err) => { this.log.warn({ err }, 'wsError'); });
   }
@@ -189,17 +188,14 @@ export class GameConnection implements RegisteredConnection {
 
   private startHeartbeat(): void {
     this.heartbeatTimer = setInterval(() => {
-      try { this.ws.ping(); } catch { /* ignore */ }
-      if (this.heartbeatDeadline) clearTimeout(this.heartbeatDeadline);
-      this.heartbeatDeadline = setTimeout(() => {
+      if (!this.isAlive) {
         this.log.warn({ sessionId: this.sessionId }, 'heartbeatTimeout');
         try { this.ws.terminate(); } catch { /* ignore */ }
-      }, HEARTBEAT_TIMEOUT_MS);
+        return;
+      }
+      this.isAlive = false;
+      try { this.ws.ping(); } catch { /* ignore */ }
     }, HEARTBEAT_MS);
-  }
-
-  private refreshHeartbeatDeadline(): void {
-    if (this.heartbeatDeadline) { clearTimeout(this.heartbeatDeadline); this.heartbeatDeadline = null; }
   }
 
   private handleClose(code: number, reason: string): void {
@@ -207,7 +203,6 @@ export class GameConnection implements RegisteredConnection {
     this.cleanedUp = true;
     this.closed = true;
     if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
-    if (this.heartbeatDeadline) { clearTimeout(this.heartbeatDeadline); this.heartbeatDeadline = null; }
     this.registry.remove(this.room.id, this);
     this.log.info({ sessionId: this.sessionId, code, reason }, 'detach');
 
