@@ -162,6 +162,17 @@ describe('RoomManager join/leave/slots', () => {
     }
   });
 
+  it('setSlot frees the displaced human sessionIndex for any new slot kind', () => {
+    mgr.addMember(host.id, { sessionId: 's2', playerName: 'P2' });
+    mgr.setSlot(host.id, 1, { kind: 'ai', difficulty: 'easy' }, { actorSessionId: 'host' });
+    // s2 should now be free to join another room.
+    const other = mgr.create({
+      sessionId: 's2', playerName: 'P2',
+      config: baseConfig(), allowAiFill: true, visibility: 'public',
+    });
+    expect(other.room.hostSessionId).toBe('s2');
+  });
+
   it('setSlot rejects non-host actors', () => {
     mgr.addMember(host.id, { sessionId: 's2', playerName: 'P2' });
     expect(() =>

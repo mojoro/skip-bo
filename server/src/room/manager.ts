@@ -186,7 +186,11 @@ export class RoomManager {
     if (current.kind === 'human' && current.sessionId === room.hostSessionId) {
       throw new RoomError('selfKick', 'Host cannot self-kick.');
     }
-    if (current.kind === 'human' && desired.kind === 'open') {
+    // A host-driven swap displaces the seated human regardless of what the
+    // seat becomes next. The earlier guard only cleared sessionIndex on the
+    // open→ path, so a human→ai or human→locked change stranded the
+    // session's mapping and blocked them from joining any other room.
+    if (current.kind === 'human') {
       room.kickedSessionIds.add(current.sessionId);
       this.sessionIndex.delete(current.sessionId);
     }
