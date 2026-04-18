@@ -61,6 +61,11 @@ export class GameConnection implements RegisteredConnection {
 
   send(message: unknown): void {
     if (this.closed) return;
+    // A peer-initiated close puts the socket in CLOSING before our handleClose
+    // listener flips `this.closed`. Skipping the send here avoids a noisy
+    // `sendAfterClose` error path from ws for every broadcast during that
+    // window — we'd do the same cleanup when handleClose finally runs.
+    if (this.ws.readyState !== this.ws.OPEN) return;
     if (this.ws.bufferedAmount > BACKPRESSURE_LIMIT) {
       this.log.warn({ roomId: this.room.id, sessionId: this.sessionId, buffered: this.ws.bufferedAmount }, 'backpressureKill');
       this.close(1008, 'slow consumer');
