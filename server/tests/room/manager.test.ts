@@ -144,6 +144,14 @@ describe('RoomManager join/leave/slots', () => {
     expect(host.slots[1]!.kind).toBe('open');
   });
 
+  it('removeMember is rejected with a phase error during playing', () => {
+    mgr.addMember(host.id, { sessionId: 's2', playerName: 'P2' });
+    mgr.startGame(host.id, { actorSessionId: 'host' });
+    expect(() =>
+      mgr.removeMember(host.id, 's2', { actorSessionId: 's2' }),
+    ).toThrow(/in progress/);
+  });
+
   it('setSlot from host to ai swaps cleanly during waiting', () => {
     mgr.setSlot(host.id, 1, { kind: 'ai', difficulty: 'easy' }, { actorSessionId: 'host' });
     const slot = host.slots[1]!;

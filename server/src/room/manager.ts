@@ -130,6 +130,13 @@ export class RoomManager {
     opts: { actorSessionId: string },
   ): void {
     const room = this.requireRoom(roomId);
+    // Mid-game removal would leave the engine player entry orphaned — dispatch
+    // would then refuse every action from that seat while no bot steps in,
+    // stalling the turn forever. To quit mid-game, clients must disconnect;
+    // the grace timer then hands the seat to a bot.
+    if (room.phase === 'playing') {
+      throw new RoomError('phase', 'Members cannot be removed while the game is in progress.');
+    }
     const selfLeave = opts.actorSessionId === targetSessionId;
     const isHost = opts.actorSessionId === room.hostSessionId;
     if (!selfLeave && !isHost) {
@@ -147,14 +154,7 @@ export class RoomManager {
     if (targetSessionId === room.hostSessionId) {
       const result = migrateHost(room);
       if (result === 'empty') {
-        if (room.phase === 'waiting') {
-          this.deleteRoom(room, { reason: 'empty' });
-          return;
-        }
-        // playing: grace-window handling is Section 3; stub by finishing immediately.
-        markFinished(room, 'abandoned');
-        this.scheduleCleanup(room);
-        this.emitRoomRemoved(room);
+        this.deleteRoom(room, { reason: 'empty' });
         return;
       }
     }
