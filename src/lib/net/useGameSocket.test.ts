@@ -17,4 +17,9 @@ describe('useGameSocket helpers', () => {
     for (const code of [4002, 4003, 4004, 4005]) expect(shouldReconnect(code)).toBe(false);
     for (const code of [1001, 1006, 1011]) expect(shouldReconnect(code)).toBe(true);
   });
+
+  it('saturates the backoff at the attempt ceiling', () => {
+    expect(computeReconnectDelay(1_000_000, () => 1)).toBe(10_000);
+    expect(computeReconnectDelay(1_000_000, () => 0.5)).toBe(Math.round(10_000 * 0.75));
+  });
 });

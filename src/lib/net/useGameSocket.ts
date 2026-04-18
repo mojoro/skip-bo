@@ -5,8 +5,11 @@ import type { GameAction } from '@/lib/game/types';
 import type { ChatEntry, ClientMessage, GameView, ServerMessage } from './protocol';
 import { TERMINAL_CLOSE_CODES } from './protocol';
 
+export const MAX_RECONNECT_ATTEMPT = 16;
+
 export function computeReconnectDelay(attempt: number, rand: () => number = Math.random): number {
-  const base = Math.min(10_000, 500 * Math.pow(2, attempt));
+  const capped = Math.min(attempt, MAX_RECONNECT_ATTEMPT);
+  const base = Math.min(10_000, 500 * Math.pow(2, capped));
   const jitter = 0.5 + rand() / 2;
   return Math.round(base * jitter);
 }
@@ -84,7 +87,7 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
       setLastError({ code: ev.code, reason: ev.reason });
       if (!shouldReconnect(ev.code)) { setStatus('closed'); return; }
       const delay = computeReconnectDelay(attemptRef.current);
-      attemptRef.current += 1;
+      attemptRef.current = Math.min(attemptRef.current + 1, MAX_RECONNECT_ATTEMPT);
       setStatus('reconnecting');
       reconnectTimerRef.current = setTimeout(connect, delay);
     };
@@ -113,10 +116,16 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null; }
       const ws = wsRef.current;
       wsRef.current = null;
-      if (ws) { try { ws.close(1000); } catch { /* ignore */ } }
+      if (ws) {
+        ws.onopen = null;
+        ws.onmessage = null;
+        ws.onclose = null;
+        ws.onerror = null;
+        try { ws.close(1000); } catch { /* ignore */ }
+      }
     };
   }, [connect]);
 
