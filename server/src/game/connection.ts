@@ -2,7 +2,7 @@ import type { WebSocket } from 'ws';
 import type { RoomManager } from '../room/manager';
 import type { Room } from '../types';
 import type { GameRegistry, RegisteredConnection } from './registry';
-import { ClientMessageSchema, MAX_CHAT_LEN, type ServerMessage } from './protocol';
+import { ClientMessageSchema, type ServerMessage } from './protocol';
 import { dispatchMessage } from './dispatch';
 import { buildGameView } from './view';
 import { startGrace, cancelGrace } from './grace';
@@ -138,7 +138,6 @@ export class GameConnection implements RegisteredConnection {
     const msg = check.data;
     if (msg.type === 'chat') {
       if (!takeToken(this.chatBucket, CHAT_RATE_LIMIT)) return;
-      if (msg.text.length > MAX_CHAT_LEN) return;
     }
     const effects = dispatchMessage(this.room, this.sessionId, msg, { now: () => Date.now() });
     for (const e of effects) {
