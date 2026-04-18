@@ -6,7 +6,7 @@ import { defaultPartnershipRules } from '@engine/types';
 
 describe('buildGameView', () => {
   it('stamps seat presence for every slot', () => {
-    const room = makeRoom();
+    const room = makeRoom({ hostSessionId: 'alice' });
     room.slots = [
       {
         kind: 'human',
@@ -44,6 +44,7 @@ describe('buildGameView', () => {
       connected: true,
       graceDeadline: null,
       botControlled: false,
+      isHost: true,
     });
     expect(view.seats[1]).toEqual({
       slotIndex: 1,
@@ -52,6 +53,7 @@ describe('buildGameView', () => {
       connected: false,
       graceDeadline: 1700,
       botControlled: false,
+      isHost: false,
     });
     expect(view.seats[2]).toEqual({
       slotIndex: 2,
@@ -60,6 +62,7 @@ describe('buildGameView', () => {
       connected: true,
       graceDeadline: null,
       botControlled: false,
+      isHost: false,
     });
     expect(view.seats[3]).toEqual({
       slotIndex: 3,
@@ -68,6 +71,7 @@ describe('buildGameView', () => {
       connected: false,
       graceDeadline: null,
       botControlled: false,
+      isHost: false,
     });
     expect(view.view.youSlotIndex).toBe(0);
   });

@@ -42,6 +42,7 @@ export interface GameViewSeat {
   connected: boolean;
   graceDeadline: number | null;
   botControlled: boolean;
+  isHost: boolean;
 }
 
 export interface GameView {

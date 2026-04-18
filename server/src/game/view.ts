@@ -11,6 +11,7 @@ export interface GameViewSeat {
   connected: boolean;
   graceDeadline: number | null;
   botControlled: boolean;
+  isHost: boolean;
 }
 
 export type PublicPartnershipRules = Omit<PartnershipRules, 'teams'> & {
@@ -80,6 +81,7 @@ function publicizeOpponents(room: Room, raw: OpponentView[]): PublicOpponentView
 
 export function buildSeats(room: Room): GameViewSeat[] {
   return room.slots.map((slot, slotIndex) => {
+    const isHost = slot.kind === 'human' && slot.sessionId === room.hostSessionId;
     switch (slot.kind) {
       case 'human':
         return {
@@ -89,6 +91,7 @@ export function buildSeats(room: Room): GameViewSeat[] {
           connected: slot.connected,
           graceDeadline: slot.graceDeadline,
           botControlled: slot.botControlled,
+          isHost,
         };
       case 'ai':
         return {
@@ -98,6 +101,7 @@ export function buildSeats(room: Room): GameViewSeat[] {
           connected: true,
           graceDeadline: null,
           botControlled: false,
+          isHost: false,
         };
       case 'open':
         return {
@@ -107,6 +111,7 @@ export function buildSeats(room: Room): GameViewSeat[] {
           connected: false,
           graceDeadline: null,
           botControlled: false,
+          isHost: false,
         };
       case 'locked':
         return {
@@ -116,6 +121,7 @@ export function buildSeats(room: Room): GameViewSeat[] {
           connected: false,
           graceDeadline: null,
           botControlled: false,
+          isHost: false,
         };
     }
   });
