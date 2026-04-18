@@ -8,6 +8,7 @@ import { problemResponse } from '../problemJson';
 import { Router } from './router';
 import type { RoomManager } from '../room/manager';
 import { postRoom, listRooms, getRoom, patchRoom } from './handlers/rooms';
+import { postMember, deleteMember } from './handlers/members';
 
 export interface BuildOptions {
   roomManager: RoomManager;
@@ -57,4 +58,6 @@ export function mountRoutes(router: Router, mgr: RoomManager): void {
   router.add('POST', '/v1/rooms', postRoom(mgr));
   router.add('GET', '/v1/rooms/:id', getRoom(mgr));
   router.add('PATCH', '/v1/rooms/:id', patchRoom(mgr));
+  router.add('POST', '/v1/rooms/:id/members', postMember(mgr));
+  router.add('DELETE', '/v1/rooms/:id/members/:sessionId', deleteMember(mgr));
 }
