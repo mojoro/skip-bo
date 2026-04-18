@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { WebSocket } from 'ws';
+import { createConnection } from 'node:net';
 import type { AddressInfo } from 'node:net';
 import { buildHttpServer, mountRoutes } from '../../src/http/server';
 import { RoomManager } from '../../src/room/manager';
@@ -13,13 +14,13 @@ interface Harness {
   close: () => Promise<void>;
 }
 
-async function startHarness(): Promise<Harness> {
+async function startHarness(corsOrigin = '*'): Promise<Harness> {
   const mgr = new RoomManager();
   const registry = new LobbyStreamRegistry();
   const gameRegistry = new GameRegistry();
-  const { httpServer, router } = buildHttpServer({ roomManager: mgr, corsOrigin: '*' });
+  const { httpServer, router } = buildHttpServer({ roomManager: mgr, corsOrigin });
   mountRoutes(router, mgr, { registry });
-  httpServer.on('upgrade', createGameUpgradeHandler({ manager: mgr, registry: gameRegistry, corsOrigin: '*' }).handleUpgrade);
+  httpServer.on('upgrade', createGameUpgradeHandler({ manager: mgr, registry: gameRegistry, corsOrigin }).handleUpgrade);
   await new Promise<void>((r) => httpServer.listen(0, r));
   const { port } = httpServer.address() as AddressInfo;
   return {
@@ -111,4 +112,39 @@ describe('game ws handshake', () => {
     expect(firstClose.code).toBe(4004);
     second.close();
   });
+
+  it('rejects upgrades with a mismatched Origin header (CSWSH defense)', async () => {
+    // Defense-in-depth regression: the handshake's Origin check is the only
+    // line between a configured production server and a Cross-Site WebSocket
+    // Hijacking attempt. Browser `new WebSocket` locks Origin to the page
+    // origin, so this test drives the Upgrade at the TCP level to spoof it.
+    h = await startHarness('https://skip-bo.example');
+    // Raw Upgrade with deliberately-wrong Origin. No session lookup happens
+    // because the Origin check runs before path parsing — assert on the 403
+    // line the handshake's `bail` helper writes back.
+    const headers = [
+      `GET /rooms/whatever/game?sessionId=anyone HTTP/1.1`,
+      `Host: 127.0.0.1:${h.port}`,
+      `Upgrade: websocket`,
+      `Connection: Upgrade`,
+      `Sec-WebSocket-Version: 13`,
+      `Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==`,
+      `Origin: https://evil.example`,
+      '', '',
+    ].join('\r\n');
+    const status = await new Promise<string>((resolve, reject) => {
+      const sock = createConnection({ host: '127.0.0.1', port: h.port });
+      const chunks: Buffer[] = [];
+      const t = setTimeout(() => reject(new Error('origin-check-timeout')), 2000);
+      sock.on('data', (b) => chunks.push(b));
+      sock.on('close', () => {
+        clearTimeout(t);
+        resolve(Buffer.concat(chunks).toString('utf-8').split('\r\n')[0] ?? '');
+      });
+      sock.on('error', reject);
+      sock.write(headers);
+    });
+    expect(status).toMatch(/^HTTP\/1\.1 403/);
+  });
+
 });
