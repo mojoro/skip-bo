@@ -1,0 +1,13 @@
+services:
+  server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    ports:
+      - "8787:8787"
+    environment:
+      NODE_ENV: production
+      CORS_ORIGIN: http://localhost:3000
+      LOG_LEVEL: info
+      WS_BASE_URL: ws://localhost:8787
+    restart: unless-stopped
