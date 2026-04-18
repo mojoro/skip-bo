@@ -76,6 +76,8 @@ export class GameConnection implements RegisteredConnection {
   }
 
   private attach(): void {
+    this.ws.on('error', (err) => { this.log.warn({ err }, 'wsError'); });
+
     const slot = this.room.slots[this.slotIndex];
     if (slot?.kind === 'human') {
       slot.connected = true;
@@ -92,7 +94,6 @@ export class GameConnection implements RegisteredConnection {
     this.ws.on('message', (raw) => this.handleMessage(raw));
     this.ws.on('pong', () => { this.isAlive = true; });
     this.ws.on('close', (code, reason) => this.handleClose(code, reason.toString()));
-    this.ws.on('error', (err) => { this.log.warn({ err }, 'wsError'); });
   }
 
   private sendHello(): void {

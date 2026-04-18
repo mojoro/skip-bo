@@ -19,7 +19,17 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): (req: IncomingMes
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES });
   const log = logger.child({ component: 'gameWs.handshake' });
 
+  const onSocketError = (err: Error): void => {
+    log.warn({ err }, 'upgradeSocketError');
+  };
+
+  wss.on('wsClientError', (err, socket) => {
+    log.warn({ err }, 'wsClientError');
+    try { socket.destroy(); } catch { /* ignore */ }
+  });
+
   return (req, socket, head) => {
+    socket.on('error', onSocketError);
     try {
       const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
       const match = PATH_RE.exec(url.pathname);
@@ -45,13 +55,19 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): (req: IncomingMes
       const valid = room && mappedRoomId === roomId && room.phase === 'playing';
 
       if (!valid) {
-        wss.handleUpgrade(req, socket, head, (ws) => ws.close(4003, 'invalid session'));
+        wss.handleUpgrade(req, socket, head, (ws) => {
+          socket.removeListener('error', onSocketError);
+          ws.close(4003, 'invalid session');
+        });
         return;
       }
 
       const slotIndex = room!.slots.findIndex((s) => s.kind === 'human' && s.sessionId === sessionId);
       if (slotIndex < 0) {
-        wss.handleUpgrade(req, socket, head, (ws) => ws.close(4003, 'no slot'));
+        wss.handleUpgrade(req, socket, head, (ws) => {
+          socket.removeListener('error', onSocketError);
+          ws.close(4003, 'no slot');
+        });
         return;
       }
 
@@ -62,6 +78,7 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): (req: IncomingMes
       }
 
       wss.handleUpgrade(req, socket, head, (ws) => {
+        socket.removeListener('error', onSocketError);
         new GameConnection({
           ws, room: room!, sessionId, slotIndex,
           manager: deps.manager, registry: deps.registry,
