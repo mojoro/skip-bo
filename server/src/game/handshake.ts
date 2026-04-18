@@ -1,4 +1,5 @@
 import type { IncomingMessage } from 'node:http';
+import type { Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer } from 'ws';
 import type { RoomManager } from '../room/manager';
@@ -54,7 +55,9 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): GameUpgradeHandle
       bail('HTTP/1.1 503 Service Unavailable\r\n\r\n');
       return;
     }
-    const remote = socket.remoteAddress ?? 'unknown';
+    // The HTTP server hands us the underlying net.Socket typed as Duplex —
+    // narrow to read remoteAddress. Node guarantees the concrete type here.
+    const remote = (socket as Socket).remoteAddress ?? 'unknown';
     if (!upgradeLimiter.take(remote)) {
       log.warn({ remote }, 'upgradeRateLimit');
       bail('HTTP/1.1 429 Too Many Requests\r\nRetry-After: 10\r\n\r\n');
