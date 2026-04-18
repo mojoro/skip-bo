@@ -9,6 +9,11 @@ import { GameRegistry } from './game/registry';
 import { createGameUpgradeHandler } from './game/handshake';
 
 function main(): void {
+  if (process.env.NODE_ENV === 'production' && config.corsOrigin === '*') {
+    logger.fatal('CORS_ORIGIN must be set in production to prevent CSWSH');
+    process.exit(1);
+  }
+
   const roomManager = new RoomManager();
   const registry = new LobbyStreamRegistry();
   const gameRegistry = new GameRegistry();
