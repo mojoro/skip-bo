@@ -34,7 +34,7 @@ export class GameRegistry {
   forEachInRoom(roomId: string, fn: (conn: RegisteredConnection) => void): void {
     const set = this.rooms.get(roomId);
     if (!set) return;
-    for (const conn of set) fn(conn);
+    for (const conn of [...set]) fn(conn);
   }
 
   broadcast(roomId: string, message: unknown): void {
