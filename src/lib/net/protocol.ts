@@ -70,4 +70,7 @@ export interface ChatEntry {
 // 1008 is the server's policy-violation kick (rate-limit spam, repeat illegal
 // actions, bad message frame). Auto-reconnecting under the same sessionId
 // would just earn another 1008 — treat as terminal and let the user intervene.
-export const TERMINAL_CLOSE_CODES = new Set([1008, 4002, 4003, 4004, 4005]);
+// 1003 (binary not supported) and 1009 (message too large) are also the
+// client's own fault: a buggy client that keeps sending binary frames or
+// oversized payloads would just re-earn the same kick on every retry.
+export const TERMINAL_CLOSE_CODES = new Set([1003, 1008, 1009, 4002, 4003, 4004, 4005]);
