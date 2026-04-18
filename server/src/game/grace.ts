@@ -12,9 +12,11 @@ export function startGrace(room: Room, slotIndex: number, opts: StartGraceOpts):
   if (slot.graceTimer) clearTimeout(slot.graceTimer);
   slot.graceDeadline = Date.now() + GRACE_MS;
   slot.graceTimer = setTimeout(() => {
-    slot.graceTimer = null;
-    slot.graceDeadline = null;
-    slot.botControlled = true;
+    const current = room.slots[slotIndex];
+    if (!current || current.kind !== 'human') return;
+    current.graceTimer = null;
+    current.graceDeadline = null;
+    current.botControlled = true;
     opts.onExpire();
   }, GRACE_MS);
   slot.graceTimer.unref();

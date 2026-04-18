@@ -25,6 +25,12 @@ export function maybeRunBotTurn(room: Room, deps: BotDeps): void {
     room.botPending.delete(slotIndex);
     if (room.phase !== 'playing' || !room.game) return;
     if (currentPlayerSlotIndex(room) !== slotIndex) return;
+    const current = room.slots[slotIndex];
+    if (!current) return;
+    const stillBot =
+      current.kind === 'ai' ||
+      (current.kind === 'human' && current.botControlled);
+    if (!stillBot) return;
     const action = pickRandomLegalAction(room.game);
     if (!action) return;
     const result = applyAction(room.game, action);
