@@ -42,10 +42,15 @@ export class GameRegistry {
   }
 
   broadcastCloseAll(code: number, reason: string): void {
-    for (const [roomId, set] of this.rooms) {
+    // Snapshot entries before iterating so we match the defensive pattern in
+    // forEachInRoom: a sync close handler could otherwise mutate the Map
+    // mid-iteration (doc-audit #7). ECMAScript Map iterator semantics would
+    // make this safe today, but consistency beats trusting iterator subtleties.
+    const snapshot = [...this.rooms.entries()];
+    this.rooms.clear();
+    for (const [, set] of snapshot) {
       for (const conn of set) conn.close(code, reason);
       set.clear();
-      this.rooms.delete(roomId);
     }
   }
 
