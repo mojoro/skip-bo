@@ -249,6 +249,8 @@ export class RoomManager {
     return { gamesInProgress: games, playersOnline: sessions.size };
   }
 
+  allRooms(): Room[] { return [...this.rooms.values()]; }
+
   markUpdated(room: Room): void {
     this.touch(room);
     this.emitRoomUpdated(room);

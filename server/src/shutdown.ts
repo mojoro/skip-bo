@@ -1,10 +1,14 @@
 import type { Server } from 'node:http';
 import type { LobbyStreamRegistry } from './sse/registry';
+import type { GameRegistry } from './game/registry';
+import type { RoomManager } from './room/manager';
 import { logger } from './logger';
 
 export interface ShutdownOptions {
   httpServer: Server;
   registry?: LobbyStreamRegistry;
+  gameRegistry?: GameRegistry;
+  roomManager?: RoomManager;
   drainMs?: number;
 }
 
@@ -17,7 +21,24 @@ export function installShutdown(opts: ShutdownOptions): (code: number) => Promis
     logger.info({ code }, 'shutdown starting');
 
     await new Promise<void>((resolve) => opts.httpServer.close(() => resolve()));
-    // Section 3 stub: broadcast 1001 to every game WS here once it exists.
+
+    if (opts.gameRegistry) {
+      opts.gameRegistry.broadcastCloseAll(1001, 'shutdown');
+    }
+
+    if (opts.roomManager) {
+      for (const room of opts.roomManager.allRooms()) {
+        if (room.idleTimer) { clearTimeout(room.idleTimer); room.idleTimer = null; }
+        if (room.cleanupTimer) { clearTimeout(room.cleanupTimer); room.cleanupTimer = null; }
+        for (const slot of room.slots) {
+          if (slot.kind === 'human' && slot.graceTimer) {
+            clearTimeout(slot.graceTimer);
+            slot.graceTimer = null;
+            slot.graceDeadline = null;
+          }
+        }
+      }
+    }
 
     const drain = opts.drainMs ?? 5_000;
     await new Promise((r) => setTimeout(r, drain));
@@ -29,11 +50,11 @@ export function installShutdown(opts: ShutdownOptions): (code: number) => Promis
   process.on('SIGTERM', () => void shutdown(0));
   process.on('SIGINT', () => void shutdown(0));
   process.on('uncaughtException', (err) => {
-    logger.fatal({ err }, 'uncaught exception — exiting');
+    logger.fatal({ err }, 'uncaught exception');
     void shutdown(1);
   });
   process.on('unhandledRejection', (reason) => {
-    logger.fatal({ reason }, 'unhandled rejection — exiting');
+    logger.fatal({ reason }, 'unhandled rejection');
     void shutdown(1);
   });
 

@@ -5,10 +5,13 @@ import { LobbyStreamRegistry } from './sse/registry';
 import { buildHttpServer, mountRoutes } from './http/server';
 import { startStatsTicker } from './stats';
 import { installShutdown } from './shutdown';
+import { GameRegistry } from './game/registry';
+import { createGameUpgradeHandler } from './game/handshake';
 
 function main(): void {
   const roomManager = new RoomManager();
   const registry = new LobbyStreamRegistry();
+  const gameRegistry = new GameRegistry();
 
   roomManager.events.on('roomAdded', (e) => registry.publish(e));
   roomManager.events.on('roomUpdated', (e) => registry.publish(e));
@@ -18,10 +21,16 @@ function main(): void {
     roomManager,
     corsOrigin: config.corsOrigin,
   });
+
   mountRoutes(router, roomManager, { registry });
   const stopStats = startStatsTicker(roomManager, registry);
 
-  installShutdown({ httpServer, registry });
+  const upgrade = createGameUpgradeHandler({
+    manager: roomManager, registry: gameRegistry, corsOrigin: config.corsOrigin,
+  });
+  httpServer.on('upgrade', upgrade);
+
+  installShutdown({ httpServer, registry, gameRegistry, roomManager });
 
   httpServer.listen(config.httpPort, () => {
     logger.info({ port: config.httpPort }, 'server listening');
