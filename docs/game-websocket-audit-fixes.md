@@ -1,11 +1,12 @@
 # Game WebSocket audit — findings and fixes
 
-Two audit passes were run against the Section 3 game-websocket implementation on branch `game-websocket` before merge. This document captures every finding and its resolution so future sessions have the full reasoning trail.
+Three audit passes were run against the Section 3 game-websocket implementation on branch `game-websocket`. This document captures every finding and its resolution so future sessions have the full reasoning trail.
 
 - **Audit 1 (first-principles):** walked the new code against the plan, looked for obvious bugs, security gaps, and perf smells.
 - **Audit 2 (doc-grounded):** cross-referenced the code against the `ws@8` README, Node.js timers docs, pino flush docs, and React effect semantics.
+- **Audit 3 (boundary-crossing):** re-walked the same code after audits 1 and 2 shipped, focused on the engine→wire trust boundary, the shutdown ordering, and the Manager↔WS gap that was deferred. Found the two game-breaking leaks the earlier passes missed.
 
-Both audits are included. Items are labeled with their original identifier so commits and review history can be traced. "Earlier audit" = audit 1. "Doc audit" = audit 2.
+All three audits are included. Items are labeled with their original identifier so commits and review history can be traced. "Earlier audit" = audit 1. "Doc audit" = audit 2. "Third audit" = audit 3.
 
 ## Commit trail
 
@@ -32,8 +33,28 @@ Every fix is an atomic commit on `game-websocket`. Relevant commits in order:
 | `c4e499f` | Flush logs before exit and handle uncaught errors synchronously (doc #10/#13) |
 | `8837014` | Neutralize socket on unmount and cap reconnect attempt growth (doc #11/#12) |
 | `ae2d024` | Re-read slot inside grace and bot timer callbacks (both audits, minor) |
+| `8c800c1` | Strip engine seed from the broadcast view (third #A1) |
+| `bec61e2` | Map opponent and partnership ids onto slot indices on the wire (third #A2) |
+| `c8ab203` | Drop viewer sessionId from you.id in the broadcast view (third #A3-pre) |
+| `c18ff07` | Regression-test that the broadcast view hides seed and sessionIds (third #A3) |
+| `e802fba` | Broadcast 1001 before awaiting http server close on shutdown (third #C) |
+| `43fe846` | Open the game socket over wss when the page is served over https (third #D) |
+| `b230adf` | Reject removeMember with a phase error during the playing phase (third #E) |
+| `948e86f` | Clear every grace timer when finishGame transitions the phase (third #G) |
+| `182fdd9` | Free the session index on any setSlot that displaces a seated human (third #H) |
+| `c4a9b7a` | Close pre-playing handshakes with non-terminal 4006 so clients retry (third #I) |
+| `90fa7e8` | Drop queued messages on unmount so they do not replay across rooms (third #J) |
+| `01ef2e5` | Expose lastActionError separately from transport lastError (third #K) |
+| `e0c55c3` | Route game socket cleanup through a visibility-agnostic internal event (third #L) |
+| `4986ae8` | Rate-limit game upgrade handshakes per remote address (third #M) |
+| `7e15298` | Skip send when the game socket is no longer in the open state (third #N) |
+| `d04cf6e` | Skip the joining connection when broadcasting state on attach (third #O) |
+| `97d1c80` | Treat 1008 policy close as terminal to break reconnect-kick loops (third #T) |
+| `0edd9df` | Funnel every upgrade early-exit through a bail helper that removes the listener (third #U) |
+| `29859bb` | Parse the upgrade request URL against a fixed base instead of Host (third #V) |
+| `96f8615` | Narrow the upgrade socket to net.Socket to reach remoteAddress (follow-up to third #M) |
 
-Final test state: **server suite 105/105, client suite 64/64, typecheck clean.**
+Final test state after all three audits: **server suite 110/110, client suite 64/64, server typecheck clean.**
 
 ---
 
@@ -321,11 +342,12 @@ Both audits noted that the `grace` and `bot` setTimeout callbacks captured `slot
 
 Not blocking for this branch but worth a future session:
 
-1. **Private-room socket cleanup on abandonment.** The C2 event-bus subscription only fires for public rooms because `emitRoomRemoved` guards on `visibility === 'public'`. Private rooms that are abandoned (host leaves playing room) leak game sockets until process restart. Fix options: remove the visibility guard (SSE handler would need to filter), or add a dedicated `roomClosed` internal event.
+1. ~~**Private-room socket cleanup on abandonment.**~~ Closed by third-audit #L (`e0c55c3`). `RoomManager` now fires an internal `roomClosed` event on `deleteRoom` and `finishGame`; `GameRegistry` subscribes unconditionally, so sockets close regardless of visibility.
 2. **Outbound message dedup / ack IDs.** `useGameSocket.ts`'s send queue could replay an already-applied action on reconnect, causing a harmless `notYourTurn` rebound. If users start noticing the stale error surface, add ack IDs.
 3. **Broader chat/name sanitization.** Only ASCII C0/DEL stripped today. Extend to C1 (U+0080–U+009F), U+2028/U+2029, zero-width chars if any client path later uses dangerouslySetInnerHTML.
-4. **Private-room gameEnded fallback removal.** Once #1 is addressed, the 150ms `setTimeout` in `onAfterCommit` becomes fully redundant and can be deleted.
+4. **Private-room gameEnded fallback removal.** Now that #1 is closed, the 150ms `setTimeout` in `onAfterCommit` is redundant and can be deleted. Leaving it in place as belt-and-suspenders — easy follow-up.
 5. **Pre-serialize broadcasts at scale.** `JSON.stringify(msg)` runs per recipient in `send`. For N+16 viewer rooms, stringify once per view shape and pass the string to `ws.send`.
+6. **sessionId out of the URL query string.** Third-audit #F flagged it; deferred to the Section 7 AWS deploy since the proper fix (cookie or `Sec-WebSocket-Protocol` subprotocol) needs nginx config changes anyway. Not urgent now that findings A1/A2/A3 stopped the server from broadcasting sessionIds in the first place.
 
 ---
 
@@ -341,7 +363,166 @@ The doc-grounded audit explicitly checked and confirmed:
 - `ws.terminate()` is correct for heartbeat-timeout (vs `close()` which waits for a close frame that won't arrive).
 - `noServer: true` + manual `handleUpgrade` is the recommended ws pattern for mounting on an existing HTTP server.
 - Zod `.strict()` on inner schemas is the correct pattern for rejecting extras (as opposed to `.passthrough()` or the default strip).
-- `TERMINAL_CLOSE_CODES` on the client correctly includes app codes 4002-4005 and excludes 1001/1006/1011 so clients reconnect on shutdown, network flaps, and policy kicks.
+- `TERMINAL_CLOSE_CODES` on the client correctly includes app codes 4002-4005 and excludes 1001/1006/1011 so clients reconnect on shutdown, network flaps, and policy kicks. (Third audit amended: 1008 added to terminal, 4006 confirmed non-terminal.)
 - Engine validates `DISCARD.targetPlayerIndex` via partnership rules — a client cannot discard onto an opponent's pile. Server replays `applyAction` without trust.
 - `sessionRoomId(sessionId) === roomId` check at handshake is server-owned; a client cannot forge it without a prior successful REST request.
 - `SIGTERM`/`SIGINT` listeners registered once each — no listener leak.
+
+---
+
+# Audit 3 — boundary-crossing pass
+
+After audits 1 and 2 shipped, a third review ran that widened the scope to
+the engine→wire boundary (what `getPlayerView` hands the server, and what the
+server hands the client), the shutdown ordering under live traffic, and the
+Manager↔WS coupling gaps that the first two passes had explicitly deferred.
+Three blind spots emerged:
+
+1. **Naming-as-trust.** `PlayerView` sounds like a public projection, so the
+   first two audits trusted it without reading what it actually returned. It
+   returned the shuffle seed and raw sessionIds.
+2. **Ordering-in-tests.** The full-flow test closed its clients before tearing
+   down the HTTP server, masking a real shutdown deadlock for anyone running
+   against live traffic.
+3. **Scope-drifted deferrals.** A handful of "not urgent" items from the first
+   two passes compounded: blocked shutdowns, kick-loops, and a `removeMember`
+   path that silently stalled a running game after my own Section 4 REST
+   surface was added.
+
+## Critical findings
+
+### #A1 — Shuffle seed leaked in every broadcast
+
+**File:** `src/lib/game/engine.ts:427` (`getPlayerView` returns `config: state.config`)
+
+**What was wrong.** `createGame` stores the mulberry32 seed on `GameState.config.seed`. `getPlayerView` returns the full config, and `buildGameView` (server) forwarded it unchanged into `hello` / `state` / `gameEnded` messages. `createShuffledDeck`, `mulberry32`, and the whole engine module are public on the client side. With seed + stateVersion, any connected client reproduces:
+
+- The initial shuffled deck
+- Every opponent's starting hand + stock (the private-by-design slices)
+- The full draw-pile order and every future draw
+- Every future shuffle of completed build piles
+
+Verified with a 10-line POC during the audit — the seed printed straight out of `getPlayerView('alice')`.
+
+**Fix.** Introduced a wire type `PublicGameConfig` (server/src/game/view.ts) that is `Omit<GameConfig, 'seed'>` plus a sanitized partnership. `buildGameView` destructures `seed` off before constructing the outbound view. Client protocol type mirrors. Commit `8c800c1`.
+
+### #A2 — Opponent ids on the wire were raw sessionIds
+
+**File:** `src/lib/game/engine.ts:418-420` (`OpponentView.id`), via `initializeGameState` using `slot.sessionId` as the engine player id.
+
+**What was wrong.** For human players the engine id equals the sessionId. `getPlayerView` exposed `opponents[].id`, and `config.partnership.teams` stored the same ids. Alice reads `opponents[0].id` from devtools, opens a fresh tab with `?sessionId=<bob-id>`, and the handshake lets her in — the registry even kicks Bob's live connection with 4004 to make room. Seat takeover in two steps.
+
+**Fix.** `PublicPlayerView` uses slot indices on the wire: `OpponentView.slotIndex` replaces `id`; `currentPlayerSlotIndex` and `youSlotIndex` replace the engine-player-indexed equivalents; `PublicPartnershipRules.teams: number[][]` replaces the sessionId-string teams. `buildGameView` maps via `slotIndexForPlayerId`. Commit `bec61e2`.
+
+### #A3 — Viewer's own sessionId still leaked through `you.id`
+
+**File:** `server/src/game/view.ts` (post-A2)
+
+**What was wrong.** After A2, opponent ids were clean, but `view.you.id` still carried the viewer's sessionId. Technically not an attacker primitive (the viewer already knows their own session), but server-side logs or accidental forwarding paths could pick up what should stay strictly client-held.
+
+**Fix.** `PublicPlayerState = Omit<PlayerState, 'id'>`; `buildGameView` destructures `id` off `raw.you` before attaching it. Commit `c8ab203`. Regression test `c18ff07` asserts `JSON.stringify(view)` contains neither the seed nor any raw sessionId, and that partnership teams are slot indices.
+
+### #C — `httpServer.close()` hung on active WebSocket clients during shutdown
+
+**File:** `server/src/shutdown.ts`
+
+**What was wrong.** Original order: `upgrade.close()` → `await httpServer.close()` → `gameRegistry.broadcastCloseAll(1001)`. Node's `http.Server.close()` does not destroy sockets upgraded to WebSocket (documented in nodejs/node#53536), and `wss.close()` in `noServer: true` mode doesn't force-close existing connections either. Result: with any live client, the `await` never resolved and the 1001 broadcast never fired. The full-flow test didn't catch this because it explicitly closed every client before teardown.
+
+**Fix.** Reordered: tell clients to close first, drain briefly, then `httpServer.close()` completes once its remaining (now-closed) sockets drain. Added `installShutdown({onExit})` option so a new test (`server/tests/shutdown.test.ts`) could exercise the flow without killing the vitest worker. Commit `e802fba`.
+
+### #D — Client hardcoded `ws://` regardless of page protocol
+
+**File:** `src/lib/net/useGameSocket.ts`
+
+**What was wrong.** `ws://${window.location.host}`. Works on localhost. Blocks as mixed content on every HTTPS deploy, which is exactly what Section 7 (AWS + Let's Encrypt) will produce.
+
+**Fix.** Pick `wss:` when `window.location.protocol === 'https:'`. Commit `43fe846`.
+
+### #E — `removeMember` during `phase === 'playing'` stalled the game silently
+
+**File:** `server/src/room/manager.ts`
+
+**What was wrong.** `removeMember` had no phase guard. Calling it mid-game flipped the slot to `{ kind: 'open' }` but left the seated player in `room.game.players`. Dispatch refused every action from that sessionId (slot kind no longer `human`), and the bot path wouldn't pick up (`botControlled` only applies to `human`-kind slots). When the current turn reached the ghost seat, the game stalled permanently. A pre-existing Section 4 REST-surface bug that Section 3 exposed the moment a player could actually be mid-game.
+
+**Fix.** `removeMember` throws `RoomError('phase', ...)` → HTTP 409 when `phase === 'playing'`. Players quit mid-game by disconnecting; grace + bot handles the seat. Commit `b230adf`.
+
+## Important findings
+
+### #G — `finishGame` left grace timers armed
+
+**File:** `server/src/room/manager.ts`
+
+`finishGame` marked the phase finished and scheduled cleanup, but didn't `clearAllGraceTimers(room)`. A still-armed 60-second grace timer would then fire against a finished game, flip `botControlled`, and queue a pointless bot turn that logged a `broadcastState` no-op. Pure hygiene, but the kind of drift that breaks the bot subsystem later. Commit `948e86f`.
+
+### #H — `setSlot` leaked `sessionIndex` on human→ai / human→locked
+
+**File:** `server/src/room/manager.ts`
+
+Originally the `sessionIndex.delete` + `kickedSessionIds.add` cleanup only fired on `desired.kind === 'open'`. If the host promoted a seated human to `ai` or `locked`, the displaced session's `sessionRoomId` mapping stayed stale, so that session hit `sessionAlreadySeated` when trying to join any other room. Lifted the cleanup out of the open-only branch. Commit `182fdd9`.
+
+### #I — 4003 was terminal, so pre-start races froze the client
+
+**File:** `server/src/game/handshake.ts`, `src/lib/net/protocol.ts`
+
+Handshake closed pre-start and post-finish rooms with 4003 ("invalid session"), which the client treats as terminal and refuses to retry. A tab that dialed a tick before `POST /game` would freeze on a "Connection closed" screen. Split to 4006 ("room not playing") for phase mismatches, which stays out of `TERMINAL_CLOSE_CODES`. Commit `c4a9b7a`.
+
+### #J — Outbound queue persisted across room navigations
+
+**File:** `src/lib/net/useGameSocket.ts`
+
+`outboundRef` survived effect re-runs. Navigating from room A to room B flushed the old queue into the new socket's `onopen` handler, producing a burst of `notYourTurn` errors. Clear it in cleanup. Commit `90fa7e8`.
+
+### #K — `actionError` conflated with close codes in `lastError`
+
+**File:** `src/lib/net/useGameSocket.ts`
+
+Server `actionError` messages were stored as `{ code: 0, reason }` in the same `lastError` state used for close events. UIs couldn't tell "your last move was illegal" from "the socket just closed with 1008" — and could show the wrong banner after a transient actionError. Split into `lastActionError`. Commit `01ef2e5`.
+
+### #L — Private-room sockets leaked on cleanup paths
+
+**Files:** `server/src/room/manager.ts`, `server/src/index.ts`
+
+The second audit's #C2 fix (close game sockets on `roomRemoved`) was visibility-gated — private rooms never fired `roomRemoved`. With #E now blocking mid-game member removal, the remaining exposed path was any `deleteRoom` on a private room. Added a private internal `roomClosed` event on `RoomManager` (separate `EventEmitter`, not routed through the lobby bus) that `GameRegistry` subscribes to unconditionally. Fires from both `deleteRoom` and `finishGame`. Commit `e0c55c3`.
+
+### #M — No rate limit on the WS upgrade path
+
+**File:** `server/src/game/handshake.ts`
+
+REST endpoints had a per-(bearer+IP) token bucket. Handshake had none. A scripted attacker could hammer the upgrade path — each rejected 4003 still costs TCP + HTTP-upgrade round-trips + a session lookup. Added `gameUpgrade` limits (capacity 10, 2/s sustained) keyed on `socket.remoteAddress`. Commits `4986ae8` + follow-up `96f8615` narrowing `Duplex → net.Socket` to access `remoteAddress`.
+
+### #N — `GameConnection.send` logged on benign peer-close races
+
+**File:** `server/src/game/connection.ts`
+
+When the peer initiated the close, ws entered `CLOSING` before our `handleClose` flipped `this.closed`. Broadcasts in that window hit `sendAfterClose`, which fired the async callback with an error, which logged a `sendError` + called `ws.terminate()`. Test logs showed one per disconnect. Added a `this.ws.readyState !== this.ws.OPEN` guard before the send. Commit `7e15298`.
+
+### #O — `hello` followed by an immediate self-targeted `state` on attach
+
+**File:** `server/src/game/connection.ts`
+
+`attach()` sent `hello` to the new socket, then called `broadcastState()` which iterated *all* connections in the room, including the one that just received `hello`. Client got a hello + duplicate state back-to-back. Added an `exceptSessionId` parameter to `broadcastState`. Commit `d04cf6e`.
+
+## Nits / defense-in-depth
+
+### #T — 1008 was not client-terminal
+
+Server kicks for rate-limit / illegal-action spam use 1008. Without 1008 in `TERMINAL_CLOSE_CODES`, the client reconnected into the same kick. Added 1008. Commit `97d1c80`.
+
+### #U — Upgrade early-returns leaked the `onSocketError` listener
+
+Handshake early-exit paths called `socket.destroy()` without removing the error listener they'd just attached. Benign (GC reaps) but inconsistent with the three `handleUpgrade` callback paths that did clean up. Refactored every early exit through a `bail(response?)` helper that removes the listener before destroy. Commit `0edd9df`.
+
+### #V — `new URL(req.url, 'http://' + req.headers.host)` trusted the Host header
+
+Only pathname + searchParams were read today. Pinning the base to a fixed placeholder prevents a future reader from absorbing a spoofed Host into `url.origin` or `url.host`. Commit `29859bb`.
+
+## Deferred from audit 3
+
+- **#F — sessionId in the URL query string.** nginx, browser history, and operator-side log pipelines see it. Proper fix needs cookie or `Sec-WebSocket-Protocol` plumbing across REST, client, and nginx — pairs naturally with Section 7 (AWS deploy), and is far less urgent now that A1/A2/A3 stopped the server from broadcasting sessionIds in the first place.
+
+## Lessons
+
+- A type or function named `*View` / `*Public` is a naming claim, not a verified invariant. Read the return value before trusting it across a trust boundary.
+- Tests that manually clean up shared resources before teardown mask ordering bugs in the teardown path. Add at least one teardown-with-live-state case per subsystem that owns async cleanup.
+- "Not blocking" deferrals have cumulative cost. The #L private-room leak, the #F URL query, and the #E ghost-seat were all flagged as "probably fine for v1" by earlier passes; together they meant a private-room playing game could silently stall, leak sockets, and hand sessionIds to the nginx log all in the same deployment.
+- The single best cheap defense against this class of leak is a ratchet test: `expect(JSON.stringify(view)).not.toContain(secret)`. The seed leak had been shipped to main before the third audit caught it and the regression test went in.
