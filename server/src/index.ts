@@ -20,9 +20,12 @@ function main(): void {
 
   roomManager.events.on('roomAdded', (e) => registry.publish(e));
   roomManager.events.on('roomUpdated', (e) => registry.publish(e));
-  roomManager.events.on('roomRemoved', (e) => {
-    registry.publish(e);
-    gameRegistry.forEachInRoom(e.roomId, (conn) => conn.close(4005, 'room closed'));
+  roomManager.events.on('roomRemoved', (e) => registry.publish(e));
+  // Close game sockets for every room that closes, including private rooms
+  // that the lobby event channel skips on purpose. The subscriber is
+  // deliberately on the internal bus so it fires regardless of visibility.
+  roomManager.onRoomClosed((roomId) => {
+    gameRegistry.forEachInRoom(roomId, (conn) => conn.close(4005, 'room closed'));
   });
 
   const { httpServer, router } = buildHttpServer({

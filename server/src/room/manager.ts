@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import type { GameConfig } from '@engine/types';
 import type { Room, Visibility, FinishReason } from '../types';
 import { generateRoomCode, normalizeRoomCode } from './code';
@@ -27,10 +28,20 @@ export class RoomError extends Error {
 
 export class RoomManager {
   readonly events = new LobbyEventBus();
+  // Internal lifecycle bus. Always fires regardless of visibility — the
+  // lobby `roomRemoved` event only fires for public rooms, so any consumer
+  // that needs to clean up regardless of visibility (game sockets, future
+  // caches) should subscribe here instead.
+  private readonly internalEvents = new EventEmitter();
   private readonly rooms = new Map<string, Room>();
   private readonly codeIndex = new Map<string, string>();
   private readonly sessionIndex = new Map<string, string>();
   private _allowPostDeleteEmit = false;
+
+  onRoomClosed(handler: (roomId: string) => void): () => void {
+    this.internalEvents.on('roomClosed', handler);
+    return () => this.internalEvents.off('roomClosed', handler);
+  }
 
   create(input: CreateRoomInput): { room: Room } {
     if (this.sessionIndex.has(input.sessionId)) {
@@ -244,6 +255,10 @@ export class RoomManager {
     clearAllGraceTimers(room);
     this.scheduleCleanup(room);
     this.emitRoomRemoved(room);
+    // Private rooms never reach the `roomRemoved` subscriber; fire the
+    // internal channel so their game sockets drop here instead of limping
+    // until the 5-minute post-game deleteRoom.
+    this.internalEvents.emit('roomClosed', room.id);
   }
 
   stats(): { gamesInProgress: number; playersOnline: number } {
@@ -305,6 +320,10 @@ export class RoomManager {
         slot.graceDeadline = null;
       }
     }
+    // Signal game-layer cleanup (sockets, future caches) unconditionally. The
+    // lobby `roomRemoved` path below is visibility-gated; private rooms rely
+    // on this channel instead.
+    this.internalEvents.emit('roomClosed', room.id);
     // postGame rooms were already removed from the lobby by finishGame — don't double-emit.
     if (opts.reason !== 'postGame') {
       this._allowPostDeleteEmit = true;
