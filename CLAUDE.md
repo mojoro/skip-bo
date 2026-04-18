@@ -8,33 +8,23 @@ Repo: https://github.com/mojoro/skip-bo
 
 ## 🔖 Where we left off
 
-Room Manager & Lobby implementation (Tasks 1-24 in `docs/superpowers/plans/2026-04-17-room-manager-lobby.md`) is **mid-flight** on branch `room-manager-lobby`. Running under `superpowers:subagent-driven-development` with parallelized subagent dispatch.
+Section 4 (Room Manager & Lobby) is designed, specced, and implemented as the `server/` package — REST, SSE, in-memory RoomManager, pm2 + Docker. Section 3 (game WebSocket) integration points are stubbed (close codes, grace window) pending its own plan. Next up: brainstorm Section 3 or Section 5 (AI bots). Run `cd server && npm test` to exercise the full suite. Pick up via `docs/design-session-progress.md`.
 
-**Done (Tasks 1-12, 16, 22):** server package bootstrapped; shared types; room code generator; slot helpers; typed event bus; full RoomManager (create/get/list/join/leave/setSlot/startGame/finishGame + idle+post-game timers + host migration); Problem+JSON helper; HTTP server + router + 6 middleware; Zod schemas; rooms handlers (POST/GET/PATCH); SSE registry + ring buffer; OpenAPI 3.1 yaml. Plus two scaffold-fix commits: engine `noUncheckedIndexedAccess` hardening (`bb18f98`) and HTTP+SSE defensive hardening (`06272b6`, covers `res.headersSent` guard, `req.destroy()` on oversize body, router literal-escape, SSE double-close guard, subscribers snapshot in publish, ring-buffer future-id guard).
+**Follow-ups (deferred from the Tasks 1–24 review cycle):**
+1. `setSlot` orphan sessionIndex on human→locked or human→ai displacement (cleanup guard is too narrow — currently only `desired.kind === 'open'`).
+2. Double `roomRemoved` emission: `finishGame` → cleanup timer → `deleteRoom` both emit. Gate `emitRoomRemoved` on `this.rooms.has(room.id)`.
+3. `finishGame` should defensively `clearIdleTimer(room)` for invariant hygiene.
+4. `patchRoomSchema` allows partial `config` merges that could silently resize below seated count — drop `config` from PATCH or add a config-aware handler.
+5. `RoomManager.addMember` / `buildInitialSlots` seat humans as `connected: false` — intentional (means WS-attached). Flag in the WS section when Section 3 is implemented.
+6. DELETE `/v1/rooms/:id/members/:sessionId` returns 204 when the target session isn't seated (no-op); consider returning 404 for clearer client signal.
+7. Slot handler validation order: Zod body parse runs before the integer-index guard, so a request with both malformed body and non-integer index returns the `validation` problem type instead of `badIndex` (both are 422 — cosmetic problem-type mismatch).
+8. Branch coverage thin on slot + game handlers: no explicit 401 / 404 / 409 (phase) tests at the handler level.
+9. Module-level rate limiters in `server.ts` are shared across tests within a process; adding a 2nd `Bearer s1` POST `/v1/rooms` test can flake. Consider exporting a `resetLimiters()` helper for tests.
+10. Root-level `.dockerignore` is missing — `docker compose build` at context `..` will send the entire repo (`node_modules`, `.next`, `.git`) to the Docker daemon. Add a root `.dockerignore` before first real image build.
+11. Full-flow integration test reads raw SSE chunks with `.includes(...)` rather than accumulating a `\n\n`-delimited event buffer — works today, fragile if the server ever coalesces writes; `reader.cancel()` + `httpServer.close()` also aren't awaited at teardown.
+12. Plan text for ring-buffer `since(lastId)` at ~line 2810 still has the `-1` that was fixed in code — the plan markdown is the last inconsistency.
 
-**State:** server suite 57/57 passing, main-app suite 60/60 passing, typecheck clean.
-
-**Still TODO (Tasks 13, 14, 15, 17, 18, 19, 20, 21, 23, 24):**
-- Task 13 — Members handlers (POST/DELETE /v1/rooms/:id/members[:sessionId])
-- Task 14 — Slots handler (PUT /v1/rooms/:id/slots/:index)
-- Task 15 — Game handler (POST /v1/rooms/:id/game)
-- Task 17 — Lobby SSE stream handler (mount `GET /v1/lobby/stream` using the registry + snapshot + heartbeat + Last-Event-ID replay)
-- Task 18 — Throttled statsUpdate ticker
-- Task 19 — Rate-limit middleware wiring into POST /v1/rooms and member-join
-- Task 20 — Graceful shutdown + entrypoint `src/index.ts`
-- Task 21 — Dockerfile, pm2, compose, esbuild
-- Task 23 — Full-flow integration test
-- Task 24 — Close-the-loop doc/status updates (update this section; note deferred plan issues below)
-
-**Deferred plan issues for Task 24 to surface (caught during reviews):**
-1. `setSlot` orphan sessionIndex bug — human→locked or human→ai displacement doesn't clean up sessionIndex or kickedSessionIds. Plan source at line ~1077; fix: broaden the cleanup guard to any human displacement, not only `desired.kind === 'open'`.
-2. Double `roomRemoved` emission in `finishGame` → cleanup timer → `deleteRoom` both emit. Latent; fix by gating `emitRoomRemoved` on `this.rooms.has(room.id)`.
-3. `finishGame` should defensively `clearIdleTimer(room)` even though `startGame` already does — invariant fragility.
-4. `patchRoomSchema` allows `config` partial merges that could silently resize below seated count — recommend either dropping `config` from PATCH or adding a config-aware handler in a follow-up.
-5. Ring-buffer `since(lastId)` plan text at line ~2810 needs the `-1` removed so it matches the test (already fixed in code; plan text is the last inconsistency).
-6. `RoomManager.addMember` / `buildInitialSlots` now seat humans as `connected: false` — intentional: `connected` means WS-attached, the future WS layer flips it true on connect. Flag this in the WS section.
-
-**To resume:** run the next `superpowers:subagent-driven-development` wave — Tasks 13/14/15 are file-disjoint and can parallelize (each adds a handler + test + a single-line mount entry). Task 17 depends on Task 16 (done) and Task 10 (done) — can go in parallel with 13/14/15. Task 18 needs 16. Task 19 needs 10. Task 20 needs everything. Task 21 + 23 + 24 last. Read each task's "Files" list in the plan before dispatching to confirm what's disjoint.
+**State:** server suite 69/69 passing, main-app suite 60/60 passing, typecheck clean.
 
 ## Status snapshot
 

@@ -21,9 +21,9 @@ A full offline hot-seat demo was built between brainstorming Section 3 and retur
 - **Modals** — `NewGameModal`, `RulesetInfo`, `ConfirmDialog` (end-turn confirm).
 - **Repo** — pushed to https://github.com/mojoro/skip-bo (public). `main` is the single branch; `demo-snapshot` preserved locally.
 
-- **Room Manager + Lobby (Section 4)** — designed, **not yet implemented**. Full spec at `docs/superpowers/specs/2026-04-17-room-manager-lobby-design.md`. REST endpoints (Zalando-aligned, versioned `/v1/`), SSE lobby stream with deltas, host-controlled slots, 30-min idle + 5-min post-game cleanup, pm2 supervision + graceful shutdown, Problem+JSON errors, camelCase JSON, `Authorization: Bearer <sessionId>`. OpenAPI 3.1 yaml is a deliverable at build time.
+- **Room Manager + Lobby (Section 4)** — designed, specced, and **implemented** as `server/`. Plan: `docs/superpowers/plans/2026-04-17-room-manager-lobby.md`. REST endpoints (Zalando-aligned, versioned `/v1/`), SSE lobby stream with deltas, host-controlled slots, 30-min idle + 5-min post-game cleanup, pm2 supervision + graceful shutdown, Problem+JSON errors, camelCase JSON, `Authorization: Bearer <sessionId>`. OpenAPI 3.1 yaml at `server/openapi.yaml`.
 
-**Still to build:** server, client WS hook, room manager + lobby implementation (Section 4 spec'd), AI bots (Section 5), frontend architecture write-up (Section 6), AWS deploy (Section 7), testing strategy for the network layer (Section 8). UI polish list lives in `CLAUDE.md`.
+**Still to build:** client WS hook, AI bots (Section 5), frontend architecture write-up (Section 6), AWS deploy (Section 7), testing strategy for the network layer (Section 8). UI polish list lives in `CLAUDE.md`.
 
 ## Project Context
 
