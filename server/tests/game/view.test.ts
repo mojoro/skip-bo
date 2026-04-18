@@ -103,6 +103,41 @@ describe('buildGameView', () => {
     expect(view.config.partnership?.teams).toEqual([[0], [1]]);
   });
 
+  it('never leaks secrets across a mixed [human, locked, human, ai] seat layout', () => {
+    // Keystone ratchet covered the 2-player partnership layout; this variant
+    // locks in the same invariant for a seat arrangement with a non-human
+    // slot between humans plus an ai seat, which exercises the mapping layer
+    // at non-trivial player indices.
+    const room = makeRoom();
+    room.slots = [
+      { kind: 'human', sessionId: 'alice-secret', name: 'Alice', connected: true,  joinedAt: 0, graceDeadline: null, graceTimer: null, botControlled: false },
+      { kind: 'locked' },
+      { kind: 'human', sessionId: 'carol-secret', name: 'Carol', connected: false, joinedAt: 2, graceDeadline: null, graceTimer: null, botControlled: false },
+      { kind: 'ai', botId: 'bot-zeta', difficulty: 'easy' },
+    ];
+    room.config.maxPlayers = 4;
+    room.config.partnership = null;
+    room.game = initializeGameState(room);
+
+    const aliceView = buildGameView(room, 'alice-secret').view;
+    const carolView = buildGameView(room, 'carol-secret').view;
+
+    for (const view of [aliceView, carolView]) {
+      expect(view.config).not.toHaveProperty('seed');
+      const serialized = JSON.stringify(view);
+      expect(serialized).not.toContain('alice-secret');
+      expect(serialized).not.toContain('carol-secret');
+      for (const op of view.opponents) {
+        expect(typeof op.slotIndex).toBe('number');
+        expect(op).not.toHaveProperty('id');
+      }
+    }
+    // Alice sees herself at slot 0; Carol at slot 2. The locked seat has no
+    // engine player so it does not appear in opponents for either viewer.
+    expect(aliceView.youSlotIndex).toBe(0);
+    expect(carolView.youSlotIndex).toBe(2);
+  });
+
   it('throws if sessionId has no matching engine player', () => {
     const room = makeRoom();
     room.slots = [
