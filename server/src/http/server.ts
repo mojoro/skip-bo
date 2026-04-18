@@ -13,6 +13,23 @@ import { putSlot } from './handlers/slots';
 import { postGame } from './handlers/game';
 import { getLobbyStream } from './handlers/lobbyStream';
 import type { LobbyStreamRegistry } from '../sse/registry';
+import { TokenBucketLimiter, LIMITS } from './middleware/rateLimit';
+import { extractBearer } from './middleware/auth';
+
+const limiters = {
+  createRoom: new TokenBucketLimiter(LIMITS.createRoom),
+  join: new TokenBucketLimiter(LIMITS.join),
+  admin: new TokenBucketLimiter(LIMITS.admin),
+};
+
+function limiterFor(method: string, path: string): TokenBucketLimiter | null {
+  if (method === 'POST' && path === '/v1/rooms') return limiters.createRoom;
+  if (method === 'POST' && /^\/v1\/rooms\/[^/]+\/members$/.test(path)) return limiters.join;
+  if (method === 'DELETE' && /^\/v1\/rooms\/[^/]+\/members\/[^/]+$/.test(path)) return limiters.admin;
+  if (method === 'PUT' && /^\/v1\/rooms\/[^/]+\/slots\/[^/]+$/.test(path)) return limiters.admin;
+  if (method === 'PATCH' && /^\/v1\/rooms\/[^/]+$/.test(path)) return limiters.admin;
+  return null;
+}
 
 export interface BuildOptions {
   roomManager: RoomManager;
@@ -37,6 +54,17 @@ export function buildHttpServer(opts: BuildOptions): BuiltServer {
     const url = new URL(req.url ?? '/', 'http://localhost');
     const instance = url.pathname;
     try {
+      const limiter = limiterFor(req.method ?? 'GET', url.pathname);
+      if (limiter) {
+        const key = `${extractBearer(req) ?? 'anon'}::${req.socket.remoteAddress}`;
+        if (!limiter.take(key)) {
+          res.setHeader('retry-after', '10');
+          return writeProblem(res, problemResponse({
+            type: 'https://skip-bo.example.com/problems/rate-limited',
+            title: 'Too Many Requests', status: 429, instance: url.pathname,
+          }));
+        }
+      }
       const match = router.match(req.method ?? 'GET', url.pathname);
       if (!match) {
         writeProblem(res, problemResponse({

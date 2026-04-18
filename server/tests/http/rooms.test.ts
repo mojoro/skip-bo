@@ -62,6 +62,23 @@ describe('POST /v1/rooms', () => {
     });
     expect(res.status).toBe(401);
   });
+
+  it('returns 429 after exhausting create-room burst', async () => {
+    for (let i = 0; i < 3; i++) {
+      const res = await fetch(`${ctx.url}/v1/rooms`, {
+        method: 'POST',
+        headers: { authorization: 'Bearer burst', 'content-type': 'application/json' },
+        body: JSON.stringify({ playerName: `P${i}`, config: baseConfigBody(), allowAiFill: true, visibility: 'public' }),
+      });
+      expect([201, 409]).toContain(res.status);
+    }
+    const res = await fetch(`${ctx.url}/v1/rooms`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer burst', 'content-type': 'application/json' },
+      body: JSON.stringify({ playerName: 'PX', config: baseConfigBody(), allowAiFill: true, visibility: 'public' }),
+    });
+    expect(res.status).toBe(429);
+  });
 });
 
 describe('GET /v1/rooms', () => {
