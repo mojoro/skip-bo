@@ -12,7 +12,7 @@ export function playerIndexForSlotIndex(room: Room, slotIndex: number): number {
   const slot = room.slots[slotIndex];
   if (!slot || (slot.kind !== 'human' && slot.kind !== 'ai')) return -1;
   const id = slot.kind === 'human' ? slot.sessionId : slot.botId;
-  return room.game.players.findIndex((p) => p.id === id);
+  return room.game.players.findIndex((p: { id: string }) => p.id === id);
 }
 
 export function currentPlayerSlotIndex(room: Room): number {
