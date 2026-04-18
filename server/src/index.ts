@@ -20,7 +20,10 @@ function main(): void {
 
   roomManager.events.on('roomAdded', (e) => registry.publish(e));
   roomManager.events.on('roomUpdated', (e) => registry.publish(e));
-  roomManager.events.on('roomRemoved', (e) => registry.publish(e));
+  roomManager.events.on('roomRemoved', (e) => {
+    registry.publish(e);
+    gameRegistry.forEachInRoom(e.roomId, (conn) => conn.close(4005, 'room closed'));
+  });
 
   const { httpServer, router } = buildHttpServer({
     roomManager,
