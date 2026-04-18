@@ -4,7 +4,7 @@ import type { Room } from '../types';
 import type { GameRegistry, RegisteredConnection } from './registry';
 import { ClientMessageSchema, type ServerMessage } from './protocol';
 import { dispatchMessage } from './dispatch';
-import { buildGameView } from './view';
+import { buildGameView, buildSeats } from './view';
 import { startGrace, cancelGrace } from './grace';
 import { maybeRunBotTurn } from './bot';
 import { logger } from '../logger';
@@ -106,9 +106,10 @@ export class GameConnection implements RegisteredConnection {
   private broadcastState(): void {
     if (!this.room.game) return;
     const stateVersion = this.room.game.stateVersion;
+    const seats = buildSeats(this.room);
     this.registry.forEachInRoom(this.room.id, (conn) => {
       try {
-        const view = buildGameView(this.room, conn.sessionId);
+        const view = buildGameView(this.room, conn.sessionId, seats);
         const msg: ServerMessage = { type: 'state', stateVersion, view };
         conn.send(msg);
       } catch (err) {
@@ -164,9 +165,10 @@ export class GameConnection implements RegisteredConnection {
   private onAfterCommit(): void {
     if (this.room.game && this.room.game.phase === 'finished') {
       const stateVersion = this.room.game.stateVersion;
+      const endSeats = buildSeats(this.room);
       this.registry.forEachInRoom(this.room.id, (conn) => {
         try {
-          const view = buildGameView(this.room, conn.sessionId);
+          const view = buildGameView(this.room, conn.sessionId, endSeats);
           const msg: ServerMessage = { type: 'gameEnded', stateVersion, view, reason: 'winner' };
           conn.send(msg);
         } catch { /* ignore */ }

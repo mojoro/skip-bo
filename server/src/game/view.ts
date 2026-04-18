@@ -16,10 +16,8 @@ export interface GameView {
   seats: GameViewSeat[];
 }
 
-export function buildGameView(room: Room, sessionId: string): GameView {
-  if (!room.game) throw new Error('buildGameView: room has no game');
-  const view = getPlayerView(room.game, sessionId);
-  const seats: GameViewSeat[] = room.slots.map((slot, slotIndex) => {
+export function buildSeats(room: Room): GameViewSeat[] {
+  return room.slots.map((slot, slotIndex) => {
     switch (slot.kind) {
       case 'human':
         return {
@@ -59,5 +57,10 @@ export function buildGameView(room: Room, sessionId: string): GameView {
         };
     }
   });
-  return { view, seats };
+}
+
+export function buildGameView(room: Room, sessionId: string, seats?: GameViewSeat[]): GameView {
+  if (!room.game) throw new Error('buildGameView: room has no game');
+  const view = getPlayerView(room.game, sessionId);
+  return { view, seats: seats ?? buildSeats(room) };
 }
