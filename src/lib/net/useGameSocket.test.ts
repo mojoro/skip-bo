@@ -14,8 +14,10 @@ describe('useGameSocket helpers', () => {
   });
 
   it('does not reconnect on terminal codes', () => {
-    for (const code of [4002, 4003, 4004, 4005]) expect(shouldReconnect(code)).toBe(false);
-    for (const code of [1001, 1006, 1011]) expect(shouldReconnect(code)).toBe(true);
+    for (const code of [1008, 4002, 4003, 4004, 4005]) expect(shouldReconnect(code)).toBe(false);
+    // 1001 (going away), 1006 (abnormal close), 1011 (server error), and
+    // 4006 (room not playing yet — pre-start race) must keep reconnecting.
+    for (const code of [1001, 1006, 1011, 4006]) expect(shouldReconnect(code)).toBe(true);
   });
 
   it('saturates the backoff at the attempt ceiling', () => {

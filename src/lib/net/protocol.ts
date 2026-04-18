@@ -67,4 +67,7 @@ export interface ChatEntry {
   sentAt: number;
 }
 
-export const TERMINAL_CLOSE_CODES = new Set([4002, 4003, 4004, 4005]);
+// 1008 is the server's policy-violation kick (rate-limit spam, repeat illegal
+// actions, bad message frame). Auto-reconnecting under the same sessionId
+// would just earn another 1008 — treat as terminal and let the user intervene.
+export const TERMINAL_CLOSE_CODES = new Set([1008, 4002, 4003, 4004, 4005]);
