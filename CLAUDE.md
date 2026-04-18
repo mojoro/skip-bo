@@ -6,7 +6,7 @@ Repo: https://github.com/mojoro/skip-bo
 
 ## 🔖 Where we left off
 
-Section 4 (Room Manager & Lobby) designed, specced, implemented as `server/` — REST, SSE, in-memory RoomManager, pm2 + Docker. Section 3 (game WebSocket) integration points stubbed (close codes, grace window) pending own plan. Next: brainstorm Section 3 or Section 5 (AI bots). Run `cd server && npm test` for full suite. Pick up via `docs/design-session-progress.md`.
+Section 3 (game WebSocket) shipped as `server/src/game/`: handshake + per-socket lifecycle + grace + bot + dispatch + registry. Client hook `src/lib/net/useGameSocket.ts` consumes per-socket `GameView` broadcasts; `/local` is the hot-seat demo, `/rooms/[roomId]` the networked game route. Next: brainstorm Section 5 (AI bots — strategy layer on top of the random-legal stub) or Section 7 (AWS deploy). Run `cd server && npm test` for server suite; `npx vitest run` for main-app suite. Pick up via `docs/design-session-progress.md`.
 
 **Follow-ups (deferred from Tasks 1–24 review):**
 1. `setSlot` orphans sessionIndex on human→locked or human→ai displacement (cleanup guard too narrow — only `desired.kind === 'open'`).
@@ -23,7 +23,9 @@ Section 4 (Room Manager & Lobby) designed, specced, implemented as `server/` —
 12. Plan text for ring-buffer `since(lastId)` at ~line 2810 still has `-1` fixed in code — plan markdown last inconsistency.
 13. Root `tsconfig.json` picks up `server/` TS files but lacks `@engine/*` alias (lives in `server/tsconfig.json`). Either exclude `server/` from root tsconfig or teach it alias.
 
-**State:** server suite 69/69 pass, main-app suite 60/60 pass, typecheck clean.
+Follow-ups #2, #3 closed in Section 3 Task 2. #5 resolved: `connected: false` means not WS-attached (correct). #10 still open (root `.dockerignore` missing).
+
+**State:** server suite 103/103 pass, main-app suite 63/63 pass, typecheck clean.
 
 ## Status snapshot
 
@@ -32,11 +34,11 @@ Section 4 (Room Manager & Lobby) designed, specced, implemented as `server/` —
 - **Drag and drop (done):** custom stack under `src/lib/dnd/` — no library. Pointer Events with movement threshold, imperative transform on floating ghost, rect-based hit-test, Escape cancels. `DragDropProvider` / `useDraggable` / `useDroppable`.
 - **Modals (done):** `NewGameModal`, `RulesetInfo`, `ConfirmDialog` (end-turn confirm), `WildDirectionPicker` (inline asc/desc choice, replaces `window.confirm`).
 - **Networking — Room Manager + Lobby (done):** `server/` package with REST (rooms/members/slots/game), SSE lobby stream with snapshot+deltas+heartbeat, in-memory `RoomManager` (idle + post-game cleanup, host migration), Zod schemas, Problem+JSON errors, token-bucket rate limits, graceful shutdown, esbuild+pm2+Dockerfile. 69 Vitest tests including full-flow integration test. OpenAPI 3.1 spec at `server/openapi.yaml`.
-- **Networking — game WebSocket + client hook (not started):** Section 3 design approved; integration stubs (close codes, 60s grace window, 1001 broadcast on shutdown) already in `server/` ready for WS layer.
+- **Networking — game WebSocket + client hook (done):** `server/src/game/` adds raw-`ws` upgrade handler, per-socket `GameConnection`, `GameRegistry`, pure dispatch, per-slot 60 s grace, bot takeover (random legal move stub), full-flow integration tests. Client `useGameSocket` hook handles exponential backoff, terminal-code-aware reconnect, visibility-driven resume, bounded send queue. Hot-seat demo moved to `/local`; `/rooms/[roomId]` renders networked state.
 
 ## Stack
 
-Next.js 16 (App Router, Turbopack) · React 19 · TypeScript strict · Tailwind 4 · Vitest · no DnD library, no WS library yet.
+Next.js 16 (App Router, Turbopack) · React 19 · TypeScript strict · Tailwind 4 · Vitest · no DnD library · raw `ws@8` on server.
 
 ## Commands
 
