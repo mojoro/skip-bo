@@ -19,6 +19,8 @@ export type PublicGameConfig = Omit<GameConfig, 'seed' | 'partnership'> & {
   partnership: PublicPartnershipRules | null;
 };
 
+export type PublicPlayerState = Omit<PlayerState, 'id'>;
+
 export interface PlayerView {
   config: PublicGameConfig;
   phase: GameState['phase'];
@@ -29,7 +31,7 @@ export interface PlayerView {
   stateVersion: number;
   buildPiles: GameState['buildPiles'];
   drawPileCount: number;
-  you: PlayerState;
+  you: PublicPlayerState;
   opponents: OpponentView[];
 }
 

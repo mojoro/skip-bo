@@ -30,6 +30,10 @@ export interface PublicOpponentView {
   discardPiles: Card[][];
 }
 
+export type PublicPlayerState = Omit<PlayerState, 'id' | 'name'> & {
+  name: string;
+};
+
 export interface PublicPlayerView {
   config: PublicGameConfig;
   phase: GamePhase;
@@ -40,7 +44,7 @@ export interface PublicPlayerView {
   stateVersion: number;
   buildPiles: BuildPile[];
   drawPileCount: number;
-  you: PlayerState;
+  you: PublicPlayerState;
   opponents: PublicOpponentView[];
 }
 
@@ -120,12 +124,15 @@ export function buildSeats(room: Room): GameViewSeat[] {
 export function buildGameView(room: Room, sessionId: string, seats?: GameViewSeat[]): GameView {
   if (!room.game) throw new Error('buildGameView: room has no game');
   const raw = getPlayerView(room.game, sessionId);
-  const you = raw.you;
+  // Drop the viewer's own sessionId from `you.id` — the client already holds
+  // it, and stripping here keeps broadcast payloads (and any server-side logs
+  // that capture them) free of the identifier that authenticates the seat.
+  const { id: _id, ...youRest } = raw.you;
   const currentPlayer = room.game.players[raw.currentPlayerIndex];
   const currentPlayerSlotIndex = currentPlayer
     ? slotIndexForPlayerId(room, currentPlayer.id)
     : -1;
-  const youSlotIndex = slotIndexForPlayerId(room, you.id);
+  const youSlotIndex = slotIndexForPlayerId(room, raw.you.id);
   const view: PublicPlayerView = {
     config: publicizeConfig(room, raw.config),
     phase: raw.phase,
@@ -136,7 +143,7 @@ export function buildGameView(room: Room, sessionId: string, seats?: GameViewSea
     stateVersion: raw.stateVersion,
     buildPiles: raw.buildPiles,
     drawPileCount: raw.drawPileCount,
-    you,
+    you: youRest,
     opponents: publicizeOpponents(room, raw.opponents),
   };
   return { view, seats: seats ?? buildSeats(room) };
