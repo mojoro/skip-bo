@@ -1,6 +1,18 @@
 import type { Room } from '../types';
 
-export const GRACE_MS = 60_000;
+export const DEFAULT_GRACE_MS = 60_000;
+// Mutable so integration tests can shrink the window without shipping a DI
+// pipe through every call site. Production paths never touch this.
+let GRACE_MS_OVERRIDE: number | null = null;
+export const GRACE_MS = DEFAULT_GRACE_MS;
+
+export function __setGraceMsForTest(ms: number | null): void {
+  GRACE_MS_OVERRIDE = ms;
+}
+
+function currentGraceMs(): number {
+  return GRACE_MS_OVERRIDE ?? DEFAULT_GRACE_MS;
+}
 
 export interface StartGraceOpts {
   onExpire: () => void;
@@ -10,7 +22,8 @@ export function startGrace(room: Room, slotIndex: number, opts: StartGraceOpts):
   const slot = room.slots[slotIndex];
   if (!slot || slot.kind !== 'human') return;
   if (slot.graceTimer) clearTimeout(slot.graceTimer);
-  slot.graceDeadline = Date.now() + GRACE_MS;
+  const duration = currentGraceMs();
+  slot.graceDeadline = Date.now() + duration;
   slot.graceTimer = setTimeout(() => {
     const current = room.slots[slotIndex];
     if (!current || current.kind !== 'human') return;
@@ -18,7 +31,7 @@ export function startGrace(room: Room, slotIndex: number, opts: StartGraceOpts):
     current.graceDeadline = null;
     current.botControlled = true;
     opts.onExpire();
-  }, GRACE_MS);
+  }, duration);
   slot.graceTimer.unref();
 }
 
