@@ -99,7 +99,10 @@ export class GameConnection implements RegisteredConnection {
     this.log.info({ roomId: this.room.id, sessionId: this.sessionId, slotIndex: this.slotIndex }, 'attach');
 
     this.sendHello();
-    this.broadcastState();
+    // Notify peers that this seat's `connected` flag flipped; the joining
+    // connection already has the full state via `hello`, so exclude it to
+    // avoid sending `hello` + a duplicate `state` back-to-back.
+    this.broadcastState(this.sessionId);
     this.startHeartbeat();
 
     this.ws.on('message', (raw, isBinary) => this.handleMessage(raw, isBinary));
@@ -114,11 +117,12 @@ export class GameConnection implements RegisteredConnection {
     this.send(hello);
   }
 
-  private broadcastState(): void {
+  private broadcastState(exceptSessionId?: string): void {
     if (!this.room.game) return;
     const stateVersion = this.room.game.stateVersion;
     const seats = buildSeats(this.room);
     this.registry.forEachInRoom(this.room.id, (conn) => {
+      if (exceptSessionId && conn.sessionId === exceptSessionId) return;
       try {
         const view = buildGameView(this.room, conn.sessionId, seats);
         const msg: ServerMessage = { type: 'state', stateVersion, view };
