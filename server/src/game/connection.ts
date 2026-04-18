@@ -228,7 +228,15 @@ export class GameConnection implements RegisteredConnection {
     this.log.info({ sessionId: this.sessionId, code, reason }, 'detach');
 
     const slot = this.room.slots[this.slotIndex];
-    if (!slot || slot.kind !== 'human') return;
+    if (!slot || slot.kind !== 'human' || slot.sessionId !== this.sessionId) return;
+    // A 4004 duplicate-session kick evicts THIS connection, and the new
+    // connection has already called `attach()` — flipping `connected = true`
+    // and registering itself. If we ran the normal disconnect path now we'd
+    // stomp the live socket's slot state: mark it offline, arm a 60s grace
+    // against it, and broadcast a false "player left" frame. Checking that
+    // we're still the registered owner of this sessionId lets a stale close
+    // exit quietly.
+    if (this.registry.findBySession(this.room.id, this.sessionId) !== undefined) return;
     slot.connected = false;
 
     if (this.room.phase === 'playing') {
