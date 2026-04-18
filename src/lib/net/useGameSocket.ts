@@ -24,7 +24,13 @@ export interface GameSocket {
   view: GameView | null;
   stateVersion: number;
   status: GameSocketStatus;
+  // Transport-level close: populated by ws.onclose, including terminal codes.
   lastError: { code: number; reason: string } | null;
+  // Engine-level rejection: populated by server `actionError` messages. Kept
+  // separate so UI can distinguish "your move was illegal" from "socket was
+  // closed" — they need different handling (retry vs reconnect) and a shared
+  // field would bleed an old action error into a later close banner.
+  lastActionError: { reason: string } | null;
   sendAction: (action: GameAction) => void;
   sendChat: (text: string) => void;
   chat: ChatEntry[];
@@ -38,6 +44,7 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
   const [stateVersion, setStateVersion] = useState(0);
   const [status, setStatus] = useState<GameSocketStatus>('connecting');
   const [lastError, setLastError] = useState<{ code: number; reason: string } | null>(null);
+  const [lastActionError, setLastActionError] = useState<{ reason: string } | null>(null);
   const [chat, setChat] = useState<ChatEntry[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -77,7 +84,7 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
           setStateVersion(msg.stateVersion);
           break;
         case 'actionError':
-          setLastError({ code: 0, reason: msg.reason });
+          setLastActionError({ reason: msg.reason });
           break;
         case 'chat':
           setChat((prev) => {
@@ -149,5 +156,5 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
   const sendAction = useCallback((action: GameAction) => { enqueue({ type: 'action', action }); }, [enqueue]);
   const sendChat = useCallback((text: string) => { enqueue({ type: 'chat', text }); }, [enqueue]);
 
-  return { view, stateVersion, status, lastError, sendAction, sendChat, chat };
+  return { view, stateVersion, status, lastError, lastActionError, sendAction, sendChat, chat };
 }
