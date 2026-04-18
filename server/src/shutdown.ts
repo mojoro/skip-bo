@@ -63,13 +63,27 @@ export function installShutdown(opts: ShutdownOptions): (code: number) => Promis
 
   process.on('SIGTERM', () => void shutdown(0));
   process.on('SIGINT', () => void shutdown(0));
+  // Best-effort sync close of every live game socket before process.exit.
+  // The close frame is queued synchronously by ws.close() and typically lands
+  // in the outbound TCP buffer before the process tears down, so clients see
+  // a 1011 and can distinguish a server crash from a plain network flap
+  // (which would surface as 1006). We cannot await a drain here — Node's
+  // uncaughtException guidance says the handler must be synchronous.
+  const sweepSocketsSync = (): void => {
+    if (!opts.gameRegistry) return;
+    for (const conn of opts.gameRegistry.allConnections()) {
+      try { conn.close(1011, 'server error'); } catch { /* ignore */ }
+    }
+  };
   process.on('uncaughtException', (err) => {
     logger.fatal({ err }, 'uncaught exception');
+    sweepSocketsSync();
     logger.flush();
     onExit(1);
   });
   process.on('unhandledRejection', (reason) => {
     logger.fatal({ reason }, 'unhandled rejection');
+    sweepSocketsSync();
     logger.flush();
     onExit(1);
   });
