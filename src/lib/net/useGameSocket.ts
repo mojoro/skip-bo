@@ -53,6 +53,12 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const connect = useCallback(() => {
+    // Skip when either identifier is still hydrating. The room page reads
+    // sessionId from localStorage inside a useEffect, so the very first render
+    // calls this hook with `sessionId=''` — connecting to `?sessionId=` would
+    // earn a 400 from the handshake and noise up the console before React
+    // re-renders with the real id.
+    if (!roomId || !sessionId) return;
     // Match the page's protocol. Without this, a Next.js app served over HTTPS
     // that tries to open `ws://` gets blocked as mixed content by every modern
     // browser — the whole networked game would stop working on the production
