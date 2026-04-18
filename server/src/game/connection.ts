@@ -43,6 +43,7 @@ export class GameConnection implements RegisteredConnection {
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private heartbeatDeadline: NodeJS.Timeout | null = null;
   private closed = false;
+  private cleanedUp = false;
   private readonly log = logger.child({ component: 'gameWs' });
   private readonly msgBucket = { tokens: MSG_RATE_LIMIT.capacity, lastRefill: Date.now() };
   private readonly chatBucket = { tokens: CHAT_RATE_LIMIT.capacity, lastRefill: Date.now() };
@@ -192,7 +193,8 @@ export class GameConnection implements RegisteredConnection {
   }
 
   private handleClose(code: number, reason: string): void {
-    if (this.closed) return;
+    if (this.cleanedUp) return;
+    this.cleanedUp = true;
     this.closed = true;
     if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
     if (this.heartbeatDeadline) { clearTimeout(this.heartbeatDeadline); this.heartbeatDeadline = null; }
