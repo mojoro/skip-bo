@@ -55,10 +55,11 @@ describe('integration: full lobby flow', () => {
     for (let i = 0; i < 3; i++) {
       const c = decoder.decode((await reader.read()).value!);
       if (c.includes('event: roomRemoved')) sawRemoved = true;
+      if (sawRemoved) break;
     }
     expect(sawRemoved).toBe(true);
 
     reader.cancel();
     httpServer.close();
-  }, 30_000);
+  });
 });
