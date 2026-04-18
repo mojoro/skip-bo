@@ -6,26 +6,29 @@ Repo: https://github.com/mojoro/skip-bo
 
 ## 🔖 Where we left off
 
-Section 3 (game WebSocket) shipped as `server/src/game/`: handshake + per-socket lifecycle + grace + bot + dispatch + registry. Client hook `src/lib/net/useGameSocket.ts` consumes per-socket `GameView` broadcasts; `/local` is the hot-seat demo, `/rooms/[roomId]` the networked game route. Next: brainstorm Section 5 (AI bots — strategy layer on top of the random-legal stub) or Section 7 (AWS deploy). Run `cd server && npm test` for server suite; `npx vitest run` for main-app suite. Pick up via `docs/design-session-progress.md`.
+Section 3 (game WebSocket) shipped and survived four audit passes — `docs/game-websocket-audit-fixes.md` captures every finding. Client hook `src/lib/net/useGameSocket.ts` drives per-socket `GameView` broadcasts; `/local` is the hot-seat demo, `/rooms/[roomId]` is a themed **debug** page rendering seats + presence + host migration. The full game UI (cards, DnD, build piles) is still only in `/local`.
 
-**Follow-ups (deferred from Tasks 1–24 review):**
-1. `setSlot` orphans sessionIndex on human→locked or human→ai displacement (cleanup guard too narrow — only `desired.kind === 'open'`).
-2. Double `roomRemoved` emit: `finishGame` → cleanup timer → `deleteRoom` both emit. Gate `emitRoomRemoved` on `this.rooms.has(room.id)`.
-3. `finishGame` should defensively `clearIdleTimer(room)` for invariant hygiene.
-4. `patchRoomSchema` allows partial `config` merges that silently resize below seated count — drop `config` from PATCH or add config-aware handler.
-5. `RoomManager.addMember` / `buildInitialSlots` seat humans `connected: false` — intentional (means WS-attached). Flag in WS section when Section 3 done.
-6. DELETE `/v1/rooms/:id/members/:sessionId` returns 204 when target session not seated (no-op); consider 404 for clearer signal.
-7. Slot handler validation order: Zod body parse before integer-index guard, so request with malformed body + non-integer index returns `validation` problem type instead of `badIndex` (both 422 — cosmetic mismatch).
-8. Branch coverage thin on slot + game handlers: no explicit 401 / 404 / 409 (phase) tests at handler level.
-9. Module-level rate limiters in `server.ts` shared across tests within process; adding 2nd `Bearer s1` POST `/v1/rooms` test can flake. Export `resetLimiters()` helper for tests.
-10. Root `.dockerignore` missing — `docker compose build` at context `..` sends entire repo (`node_modules`, `.next`, `.git`) to Docker daemon. Add before first real image build.
-11. Full-flow integration test reads raw SSE chunks with `.includes(...)` rather than accumulating `\n\n`-delimited event buffer — works today, fragile if server coalesces writes; `reader.cancel()` + `httpServer.close()` not awaited at teardown.
-12. Plan text for ring-buffer `since(lastId)` at ~line 2810 still has `-1` fixed in code — plan markdown last inconsistency.
-13. Root `tsconfig.json` picks up `server/` TS files but lacks `@engine/*` alias (lives in `server/tsconfig.json`). Either exclude `server/` from root tsconfig or teach it alias.
+**Next up — Section 6: wire the real game UI into `/rooms/[roomId]`.** Today the debug page only renders seats. The hot-seat board in `/local/page.tsx` needs to be extracted into a shared component that takes `view: PublicPlayerView`, `seats: GameViewSeat[]`, `dispatch: (GameAction) => void`, so both `/local` (local `useState` dispatch) and `/rooms/[roomId]` (socket.sendAction) render identically. Key friction: hot-seat uses engine's `PlayerView` (sessionId in `you.id`, opponent ids are engine ids); wire shape is `PublicPlayerView` (id-stripped, slot-indexed). Likely wants a brainstorm before planning — forks include optimistic vs server-authoritative local apply, DnD feel under WS latency, hot-seat state shape convergence.
 
-Follow-ups #2, #3 closed in Section 3 Task 2. #5 resolved: `connected: false` means not WS-attached (correct). #10 still open (root `.dockerignore` missing).
+Sections 5 (AI bots — real strategy over the random-legal stub) and 7 (AWS deploy) come after.
 
-**State:** server suite 103/103 pass, main-app suite 63/63 pass, typecheck clean.
+**Running it locally:** server builds + runs via `cd server && npm run build && npm start` (tsx watch is broken per follow-up #14). Next dev needs `.env.local` at repo root with `NEXT_PUBLIC_GAME_WS_URL=ws://localhost:8787` or the client hook tries `ws://localhost:3000` and fails.
+
+**Follow-ups:**
+- #4. `patchRoomSchema` allows partial `config` merges that silently resize below seated count — drop `config` from PATCH or add config-aware handler.
+- #6. DELETE `/v1/rooms/:id/members/:sessionId` returns 204 when target session not seated (no-op); consider 404 for clearer signal.
+- #7. Slot handler validation order: Zod body parse before integer-index guard — cosmetic 422 type mismatch.
+- #8. Branch coverage thin on slot + game handlers: no explicit 401 / 404 / 409 (phase) tests at handler level.
+- #9. Module-level rate limiters in `server.ts` shared across tests within process. Audit-4 worked around with unique bearers; proper fix is an exported `resetLimiters()` helper.
+- #10. Root `.dockerignore` missing — `docker compose build` at context `..` ships `node_modules`/`.next`/`.git` to Docker daemon. Add before first real image build.
+- #11. SSE full-flow test reads raw chunks with `.includes(...)` rather than accumulating `\n\n`-delimited buffer; `reader.cancel()` + `httpServer.close()` not awaited at teardown.
+- #13. Root `tsconfig.json` picks up `server/` TS files but lacks `@engine/*` alias (lives in `server/tsconfig.json`). Either exclude `server/` from root tsconfig or teach it alias.
+- #14. `cd server && npm run dev` (tsx watch) fails with `module '@engine/engine' does not provide export 'createGame'` — cross-package ESM/CJS boundary (root package.json has no `"type": "module"`). Workaround: `npm run build && npm start` from `server/`. Likely fix: `package.json` with `{"type":"module"}` at `src/lib/game/`.
+- #15. Audit-4 deferred: sessionIds still land in server attach/detach/rate-limit/action-error logs, no React-level test driving `useGameSocket` through mount/unmount/visibility, chat sanitizer only strips ASCII C0/DEL.
+
+**Audit 3+4 closed these prior follow-ups:** #1 (setSlot displacement) via audit-3 #H, #2/#3 (finishGame cleanup) in Section 3 Task 2, #5 (`connected: false` semantics) resolved — means "not WS-attached".
+
+**State:** server suite 115/115, main-app suite 64/64, server typecheck clean. Root `npx tsc --noEmit` still fails only on follow-up #13 (`@engine/*` alias).
 
 ## Status snapshot
 
@@ -42,13 +45,32 @@ Next.js 16 (App Router, Turbopack) · React 19 · TypeScript strict · Tailwind 
 
 ## Commands
 
+Root (Next.js app):
+
 ```
-npm run dev        # Next.js dev server
-npm test           # vitest run (60 tests)
+npm run dev        # next dev
+npm test           # vitest run (64 tests)
 npm run test:watch # watch mode
 npm run lint       # ESLint
-npx tsc --noEmit   # typecheck
+npx tsc --noEmit   # typecheck (root — still flags @engine/* under server/, follow-up #13)
 ```
+
+Server (WS + REST):
+
+```
+cd server
+npm run build && npm start   # esbuild → node dist/index.js (tsx watch is broken, follow-up #14)
+npm test                     # vitest run (115 tests)
+npx tsc --noEmit             # typecheck — clean
+```
+
+Networked client needs `.env.local` at the repo root:
+
+```
+NEXT_PUBLIC_GAME_WS_URL=ws://localhost:8787
+```
+
+Without it, `useGameSocket` falls back to `ws://<page-host>` and can't reach the server.
 
 ## Layout
 
@@ -92,41 +114,35 @@ src/
 
 ## What's next (prioritized)
 
-### 1. Game WebSocket — Section 3 (the real needle-mover)
+### 1. Section 6 — wire the real game UI into `/rooms/[roomId]`
 
-Section 4 lobby shipped but game still hot-seat only. Section 3 = actual network play. **Not yet brainstormed/specced/planned.** Start with `superpowers:brainstorming` on the spec at `docs/design-session-progress.md` Section 3 (already rewritten with protocol detail — use as anchor, not blank page).
+`/rooms/[roomId]` is currently a themed debug view (seats + chips + host badge). `/local` still owns the full game UI (cards, DnD, build piles) against a local engine. Next session's goal: one Board component, two drivers.
 
-Design is already locked on these points (spec Section 3, in `docs/design-session-progress.md`):
-- Raw `ws` library, no Socket.IO.
-- HTTP Upgrade handshake on `/game?roomId=…&sessionId=…`. Origin check (CSWSH). Validate sessionId against `RoomManager.sessionRoomId`. Duplicate-session kick with close code 4004.
-- Protocol-level heartbeat: `ws.ping()` + `pong` event, NOT app-level JSON PING.
-- Close codes: 1000 normal, 1001 shutdown, 1008 policy, 1009 msg too big, 4001 room full, 4002 kicked, 4003 invalid session, 4004 duplicate, 4005 game ended.
-- Backpressure cap via `ws.bufferedAmount`. `maxPayload` ~16 KB. Per-connection token bucket.
-- 60s disconnect grace: seat held, then bot sub or game-end.
-- State version number on every broadcast for client reconciliation.
+**Approach sketch (confirm via brainstorm first):**
+1. Extract the tabletop Board from `/local/page.tsx` into `src/components/Board.tsx` taking `view: PublicPlayerView`, `seats: GameViewSeat[]`, `dispatch: (GameAction) => void`, `youSlotIndex: number`. No hooks beyond DnD context, no engine import.
+2. Rework `/local` to build a `PublicPlayerView`-compatible view from its local engine state (strip seed, remap engine ids to slot indices) so it consumes the same Board component.
+3. `/rooms/[roomId]` wires Board to `socket.view.view` + `socket.view.seats` + `socket.sendAction`; surface `socket.lastActionError` as a toast; gate interactions on `youSlotIndex === currentPlayerSlotIndex`.
 
-Existing integration points (already in `server/`) that the WS layer consumes:
-- `Slot.connected: boolean` — WS layer flips `true` on connect, `false` on disconnect.
-- `RoomManager.events.on('*')` — lobby SSE already subscribes; WS should publish slot/phase changes through the same bus.
-- `installShutdown({ registry, httpServer })` in `server/src/shutdown.ts` has stub comment for 1001 broadcast.
-- Engine `applyAction(state, action)` is the single dispatch contract — server validates then broadcasts `{stateVersion, state}`.
+**Forks to resolve in brainstorm:**
+- Optimistic local apply (apply action immediately, rollback on `actionError`) vs server-authoritative (wait for `state` broadcast before rendering move). Latter is simpler, lets latency show.
+- DnD under WS latency — pointer-up commits the action, ghost stays until state arrives?
+- Hot-seat turn-handoff UX vs networked (no handoff banner needed since each client is one player).
+- Win/lose UI — how to render `gameEnded` vs the in-game finished state.
 
-Client side: replace the local `useState` dispatch in `src/app/page.tsx` with a `useGameSocket(sessionId, roomId)` hook. `sessionId` in localStorage (UUID v4). Exp backoff + jitter reconnect. Close-code-aware retry policy.
+**Load-bearing invariants to preserve:**
+- A1/A2/A3 ratchet — Board must not accidentally serialize a sessionId or seed into a DOM attribute/data-* if we route props sloppily.
+- The 4-audit guarantees on connection lifecycle, grace, bot takeover, duplicate-session stay at the hook boundary — don't leak them into Board.
 
-**Brainstorm questions to surface before planning:**
-- Single `/game` endpoint for all rooms (mux by query) vs per-room path?
-- Server-authoritative action validation — replay entire `applyAction` or light pre-check?
-- State broadcast: full snapshot per action vs diff? (Skip-Bo state is tiny — full snapshot simpler.)
-- Bot substitution at grace timeout: new `Slot.kind: 'ai'` replacement or `human` stays but `connected:false` and server plays for them?
-- Test strategy for raw `ws` — real socket pairs vs mock `WebSocket`?
+### 2. Section 5 — AI bots (real strategy)
 
-### 2. AI bots (Section 5 — not drafted)
-Server-side, rule-based. Same `applyAction` contract as humans. Artificial turn delay for natural feel. Brainstorm after Section 3. Half the work, ships solo play.
+Random-legal stub exists at `server/src/game/bot.ts`. Replace with server-side rule-based or heuristic bot. Same `applyAction` contract. Artificial turn delay for natural feel. Ships solo play — half the UX cost for full game loop coverage.
 
-### 3. AWS deployment (Section 7 — not drafted)
-EC2 + Docker (image already builds) + nginx reverse proxy (Upgrade header must be explicitly forwarded — classic WS gotcha). Let's Encrypt SSL. CI/CD via GitHub Actions or manual deploy script.
+### 3. Section 7 — AWS deploy
+
+EC2 + Docker (`server/Dockerfile` already builds) + nginx reverse proxy with explicit `Upgrade` header forwarding (classic WS gotcha). Let's Encrypt SSL. CI/CD via GitHub Actions or manual deploy script. Post-deploy: set `CORS_ORIGIN`, switch client `NEXT_PUBLIC_GAME_WS_URL` to `wss://…`, close follow-up #15 sessionId-in-logs concern by moving out of URL query into a subprotocol or cookie.
 
 ### 4. UI polish (deferred by user)
+
 Useful but not ship gates:
 - Highlight valid build/discard targets when card selected or dragged.
 - Win modal with Play Again CTA (current: just ribbon).
@@ -136,9 +152,12 @@ Useful but not ship gates:
 
 ## Locked design references
 
-- `docs/design-session-progress.md` — brainstorming progress. Sections 1 (engine), 2/3 (WS protocol), 4 (Room Manager) **approved + Section 4 shipped**. Section 3 rewritten with deeper protocol detail — anchor for the WS brainstorm. Sections 5 (AI), 6 (Frontend), 7 (AWS), 8 (Testing) **not drafted**.
-- `docs/superpowers/specs/2026-04-17-room-manager-lobby-design.md` — Section 4 spec (shipped). Reference for style when writing Section 3 spec.
-- `docs/superpowers/plans/2026-04-17-room-manager-lobby.md` — Section 4 plan (executed Tasks 1-24). Reference for task granularity when writing Section 3 plan.
+- `docs/design-session-progress.md` — brainstorming progress. Sections 1 (engine), 2/3 (WS protocol), 4 (Room Manager) **approved + shipped**. Sections 5 (AI), 6 (Frontend), 7 (AWS), 8 (Testing) **not drafted**.
+- `docs/game-websocket-audit-fixes.md` — four audit passes over Section 3, every finding + fix documented with commit SHAs and file:line cites.
+- `docs/superpowers/specs/2026-04-17-room-manager-lobby-design.md` — Section 4 spec (shipped). Reference for style.
+- `docs/superpowers/specs/2026-04-18-game-websocket-design.md` — Section 3 spec (shipped). Reference for style.
+- `docs/superpowers/plans/2026-04-17-room-manager-lobby.md` — Section 4 plan (executed Tasks 1–24). Reference for task granularity.
+- `docs/superpowers/plans/2026-04-18-game-websocket.md` — Section 3 plan (executed). Reference for task granularity.
 - `~/Documents/John-Brain/WebSocket-networking-deep-dive.md` — personal notes on stack from TCP up through WS, byte-level detail on Upgrade handshake + protocol-level framing.
 
 ## Conventions
@@ -153,7 +172,7 @@ Useful but not ship gates:
 ## Known constraints
 
 - No auth / accounts (by design for v1 — sessionId sufficient).
-- No persistence — all state in-memory on server (when built), no DB.
-- No AI yet — solo play hot-seat only.
-- No network play yet — Section 3 (game WS) not implemented. Lobby works but game dispatches local only.
+- No persistence — all state in-memory on server, no DB.
+- Network plumbing works end-to-end (handshake → grace → bot → host migration → 4005 close), but `/rooms/[roomId]` only renders a debug view. Full game UI wiring is Section 6.
+- AI is a random-legal stub — Section 5 replaces it with real strategy.
 - `demo-snapshot` branch preserved locally (pre-rebase state), not pushed.
