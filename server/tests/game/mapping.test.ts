@@ -40,7 +40,7 @@ describe('slot/player mapping', () => {
       { kind: 'ai', botId: 'bot-x', difficulty: 'easy' },
     ];
     room.game = initializeGameState(room);
-    const currentPlayerId = room.game.players[room.game.currentPlayerIndex].id;
+    const currentPlayerId = room.game.players[room.game.currentPlayerIndex]!.id;
     expect(currentPlayerSlotIndex(room)).toBe(slotIndexForPlayerId(room, currentPlayerId));
   });
 });
