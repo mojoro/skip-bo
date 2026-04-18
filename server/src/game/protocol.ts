@@ -6,13 +6,13 @@ export const MAX_CHAT_LEN = 200;
 export const MAX_MESSAGE_BYTES = 16 * 1024;
 
 const CardSourceSchema = z.union([
-  z.object({ from: z.literal('hand'), index: z.number().int().min(0) }),
-  z.object({ from: z.literal('stock'), playerIndex: z.number().int().min(0) }),
+  z.object({ from: z.literal('hand'), index: z.number().int().min(0) }).strict(),
+  z.object({ from: z.literal('stock'), playerIndex: z.number().int().min(0) }).strict(),
   z.object({
     from: z.literal('discard'),
     playerIndex: z.number().int().min(0),
     pileIndex: z.number().int().min(0),
-  }),
+  }).strict(),
 ]);
 
 const BuildDirectionSchema = z.union([z.literal('asc'), z.literal('desc'), z.null()]);
@@ -23,18 +23,18 @@ const GameActionSchema: z.ZodType<GameAction> = z.union([
     source: CardSourceSchema,
     buildPileIndex: z.number().int().min(0),
     declaredDirection: BuildDirectionSchema.optional(),
-  }),
+  }).strict(),
   z.object({
     type: z.literal('DISCARD'),
     handIndex: z.number().int().min(0),
     discardPileIndex: z.number().int().min(0),
     targetPlayerIndex: z.number().int().min(0),
-  }),
+  }).strict(),
 ]);
 
 export const ClientMessageSchema = z.union([
-  z.object({ type: z.literal('action'), action: GameActionSchema }),
-  z.object({ type: z.literal('chat'), text: z.string().min(1).max(MAX_CHAT_LEN) }),
+  z.object({ type: z.literal('action'), action: GameActionSchema }).strict(),
+  z.object({ type: z.literal('chat'), text: z.string().min(1).max(MAX_CHAT_LEN) }).strict(),
 ]);
 
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
