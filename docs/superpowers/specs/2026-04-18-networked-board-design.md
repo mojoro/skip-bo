@@ -18,9 +18,10 @@ Section 3's four-audit ratchet established load-bearing invariants on the wire p
 | 2 | Data-shape convergence | Board speaks the wire shape (`PlayerView` + `GameViewSeat[]`). `/local` adapts its engine state via a pure `engineStateToView` function. Seat is refactored to take a `SeatViewModel` derived from the wire shape. |
 | 3 | DnD under latency | Release & snap-back. Ghost clears on pointer-up; card re-renders at destination when `state` arrives. No pending-ghost layer, no input blocking, no timeout. Server rejects illegal late actions via `actionError`. |
 | 4 | Win UI | Modal with two CTAs: "Back to lobby" (route to `/`) and "Keep same group" (server-driven rematch). Rematch is not deferred. |
-| 5 | Rematch mechanism | Server-driven, one-rematch-per-game. New `requestRematch` / `rematchReady` protocol pair. Server clones current config and creates a new room via existing `RoomManager`. First to join the new room is host. |
-| 6 | Rematch seating | Self-seat in the new room. No sessionId → old-slot mapping (would re-introduce sessionId into the game-registry boundary scrubbed in audit 4). |
+| 5 | Rematch mechanism | Server-driven, one-rematch-per-game. New `requestRematch` / `rematchReady` protocol pair. Server clones current config, creates a new room via `RoomManager`, pre-seats the finished game's humans, and starts the game immediately so the existing `phase === 'playing'` handshake gate works unchanged. |
+| 6 | Rematch seating | Server pre-seats the new room with each finished-game human's `sessionId` and `name`, then calls `initializeGameState`. Slots are populated in finished-game order so table geometry stays consistent. "First to connect gets host" piggybacks on existing `migrateHostAwayFromBot` — host starts as a bot-controlled sentinel, flips to the first connecting human. |
 | 7 | Rematch authorization | Any seat may request. Host-only would strand everyone if the host declined. Idempotency handles races. |
+| 7b | sessionIndex migration | The new-room creation path atomically moves each seated session from the finished room's `sessionIndex` entry to the new room's. Old-room post-finish cleanup is adjusted to skip `sessionIndex` removal for sessions whose mapping now points elsewhere. |
 | 8 | Test scope | Unit tests for the `engineStateToView` adapter + server-side wire tests for the rematch protocol. Board visual tests deferred to Section 8. |
 
 ## 6.1 — Architecture overview
@@ -102,8 +103,10 @@ engineStateToView(state,                    │
 - `src/app/rooms/[roomId]/page.tsx` — rewritten. Renders Board when `socket.view` is populated; keeps existing Placeholder/Closed outer shell for connection-state screens. Wires `onAction → socket.sendAction`, `onRequestRematch → socket.requestRematch`, `rematchRoomId → socket.rematchRoomId`, `onBackToLobby → router.push('/')`. Retains the status chip and version chip in a minimal header above the Board.
 - `src/lib/net/protocol.ts` — adds `requestRematch` ClientMessage and `rematchReady` ServerMessage.
 - `src/lib/net/useGameSocket.ts` — adds `rematchRoomId: string | null` and `requestRematch: () => void`. `rematchRoomId` clears on `roomId` / `sessionId` change (same useEffect-cleanup path that flushes the outbound queue); sticky across plain reconnects within the same room so a brief drop during the "Creating rematch…" window doesn't lose the signal.
-- `server/src/game/connection.ts` — handles `requestRematch`, validates phase, rate-limits, stashes result on the registered game, broadcasts.
-- `server/src/game/registry.ts` — adds optional `rematchRoomId: string | null` field on the registered-game entry.
+- `server/src/game/connection.ts` — handles `requestRematch`, validates phase, rate-limits, calls `RoomManager.createRematchRoom` when no mapping exists (reads `registry.getRematchRoomId` first for idempotency), stashes the new id via `registry.setRematchRoomId`, broadcasts `rematchReady`.
+- `server/src/game/handshake.ts` — after `GameConnection` sends `hello` on attach, calls `registry.getRematchRoomId(roomId)` and, if non-null, sends a trailing `rematchReady { newRoomId }` so reconnecting-into-grace sees the link.
+- `server/src/game/registry.ts` — adds `private rematchBySourceRoom: Map<string, string>` with `getRematchRoomId(sourceRoomId): string | null` and `setRematchRoomId(sourceRoomId, newRoomId): void`. Registry owns it because it already scopes state per room and survives past the finished-room cleanup window.
+- `server/src/room/manager.ts` — adds `createRematchRoom({ sourceRoom, seatedHumans }): { room: Room }` method. Updates the finished-room post-cleanup `sessionIndex` bookkeeping to skip deletions for sessions whose mapping has been reassigned (compare `sessionIndex.get(sessionId) === sourceRoomId` before deleting).
 
 ### Unchanged
 
@@ -181,8 +184,13 @@ export type ServerMessage =
 - **Phase gate.** Only when `registeredGame.state.phase === 'finished'`. Otherwise emit `actionError { reason: 'game not finished' }`.
 - **Idempotency.** If `registeredGame.rematchRoomId` is already set, skip creation and re-send `rematchReady` to the requesting socket only. Others already have it. `useGameSocket` treats the message as set-if-unset, so duplicate delivery is harmless.
 - **Rate limit.** Reuse the existing token-bucket pattern in `server/src/server.ts` — per-sessionId, bucket and refill values mirror the in-game `action` limiter so rematch spam is bounded the same way illegal-move spam already is. Over-burst gets `actionError { reason: 'rate_limit' }`. Known follow-up: limiters are still module-level shared across tests (follow-up #9), so rematch tests use unique bearers.
-- **Room creation.** `RoomManager.createRoom({ config: cloneConfig(currentGame.config), creatorSessionId: null })`. Passing `null` for the creator matches "first to join is host" — any pre-seating would contradict that. The config clone preserves `playerCount`, `ruleset`, and partnership flags but resets `teams` to empty; the fresh room's seats start open.
-- **Broadcast target.** Every open `GameConnection` for the current registered game. Bots have no WebSocket (they dispatch server-side via `bot.ts`) and are not targeted. A human in grace has no live `GameConnection` during the grace window, so they miss the instant broadcast — but the handshake handler emits a trailing `rematchReady { newRoomId }` right after `hello` when `registeredGame.rematchRoomId` is already set, so any reconnect (within grace or long after) sees the rematch link.
+- **Room creation.** New `RoomManager.createRematchRoom({ sourceRoom, seatedHumans })` method. `sourceRoom` supplies `config` (cloned structurally — same `playerCount`, `ruleset`, partnership flags; `seed` regenerated), `allowAiFill`, `visibility`. `seatedHumans` is the list of `{ sessionId, name }` pairs for every slot whose `kind === 'human'` in the finished room (connected or in grace), in original slot order. The method:
+  1. Builds slots: `seatedHumans` placed in their original slot indices as `kind: 'human'` entries with `connected: false`, `botControlled: true`, no grace timer. Other slots cloned from the finished room (AI kept, open stays open, locked stays locked).
+  2. Sets `hostSessionId` to an empty-string sentinel. The existing `migrateHostAwayFromBot` path flips host to the first connecting human on attach.
+  3. Atomically moves each seated human's `sessionIndex` entry from the finished room's id to the new room's id. The finished room's slot state is left intact so the win modal keeps rendering correctly until cleanup; cleanup is updated to skip `sessionIndex` removal for sessions whose mapping has since been reassigned (checked by re-reading `sessionIndex.get(sessionId) === oldRoomId` before deleting).
+  4. Calls `initializeGameState(room)` to deal the opening hand immediately so `room.phase === 'playing'` is satisfied by the time the first client reconnects.
+  5. Returns the created room. The caller (game connection handler) stashes `newRoomId` on the registered-game entry and broadcasts `rematchReady`.
+- **Broadcast target.** Every open `GameConnection` for the current registered game. Bots have no WebSocket (they dispatch server-side via `bot.ts`) and are not targeted. A human in grace has no live `GameConnection` during the grace window, so they miss the instant broadcast — but the handshake handler emits a trailing `rematchReady { newRoomId }` right after `hello` when `registeredGame.rematchRoomId` is already set, so any reconnect (within grace or long after) sees the rematch link. Since the new room is already playing with their session pre-seated, navigating there just reconnects under the normal gameplay handshake.
 
 ## 6.5 — Win modal + rematch UX
 
@@ -270,13 +278,23 @@ Four wire-format tests.
 - Finished game → any seat's `requestRematch` → all connected sockets receive `rematchReady { newRoomId }`.
 - Second `requestRematch` from a different seat → that socket receives `rematchReady` with the same `newRoomId`; no new room created (verify via `RoomManager.list`).
 - `requestRematch` while `phase === 'playing'` → requester receives `actionError { reason: 'game not finished' }`; no broadcast.
-- Rate limit: third `requestRematch` inside 5 s → `actionError { reason: 'rate_limit' }`.
-- Config clone: new room's config matches `ruleset`, `playerCount`, partnership flags (verify via REST `GET /v1/rooms/:id`); seats start open.
-- Reconnect after rematch: socket A disconnects → `requestRematch` fires from socket B → socket A reconnects → receives `hello` followed by `rematchReady { newRoomId }` with the same id B saw.
+- Rate limit: over-burst `requestRematch` → `actionError { reason: 'rate_limit' }` on the offending session.
+- Config clone: new room's config matches `ruleset`, `playerCount`, partnership flags (verify via REST `GET /v1/rooms/:id`); fresh seed in the cloned config is different from the original.
+- Seat pre-seeding: new room's slots carry the same `kind` shape as the finished room — humans re-seated at their original slot indices with their original `sessionId` and `name`, AI slots cloned, open/locked preserved.
+- sessionIndex migration: after rematch, `sessionIndex.get(oldSessionId) === newRoomId` for every seated human. Old-room cleanup fires and does not unset those entries.
+- Phase on creation: new room is `phase === 'playing'` immediately (no lobby gate), so the next game WS handshake passes `phase === 'playing'` without any pre-join REST call.
+- Host on connect: new room starts with `hostSessionId === ''` (sentinel). First human socket to attach triggers `migrateHostAwayFromBot`, which flips `hostSessionId` to that session. Verified by state broadcast including `seats[n].isHost === true` for the first attacher.
+- Reconnect after rematch: socket A disconnects → `requestRematch` fires from socket B → socket A reconnects to the old room → receives `hello` followed by `rematchReady { newRoomId }` with the same id B saw.
 
-### Registry unit test (new, server suite)
+### Registry unit tests (new, server suite)
 
-`registeredGame.rematchRoomId` starts `null`, set-once on first rematch, idempotent on subsequent calls.
+`registry.getRematchRoomId` starts `null`, set-once via `setRematchRoomId`, idempotent on subsequent calls with the same or different `newRoomId` values (last write wins but `setRematchRoomId` is called at most once per source room by the connection handler).
+
+### RoomManager unit tests (new, server suite)
+
+- `createRematchRoom` moves each seated human's `sessionIndex` entry from old roomId → new roomId atomically (verify by calling `sessionRoomId(sessionId)` after creation).
+- Finished-room cleanup does not delete `sessionIndex` entries that have been reassigned to a rematch room.
+- `createRematchRoom` sets `phase='playing'` and populates `room.game` immediately.
 
 ### Deferred
 
