@@ -61,7 +61,10 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): GameUpgradeHandle
       return;
     }
     try {
-      const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+      // Fixed base — the client-supplied Host header has no bearing on what
+      // we read (pathname + searchParams only), and pinning it keeps any
+      // future reader from absorbing a spoofed Host into url.origin/.host.
+      const url = new URL(req.url ?? '/', 'http://skip-bo.internal');
       const match = PATH_RE.exec(url.pathname);
       if (!match) { bail(); return; }
       const roomId = decodeURIComponent(match[1]!);
