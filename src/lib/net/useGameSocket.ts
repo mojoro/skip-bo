@@ -132,6 +132,10 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
         ws.onerror = null;
         try { ws.close(1000); } catch { /* ignore */ }
       }
+      // Flush the outbound queue: messages composed for the old (roomId,
+      // sessionId) pair would otherwise replay into the next room and be
+      // rejected as `notYourTurn`.
+      outboundRef.current = [];
     };
   }, [connect]);
 
