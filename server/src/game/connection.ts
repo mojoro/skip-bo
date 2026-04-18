@@ -243,6 +243,8 @@ export class GameConnection implements RegisteredConnection {
       startGrace(this.room, this.slotIndex, {
         onExpire: () => {
           this.log.info({ sessionId: this.sessionId }, 'graceExpire');
+          const newHost = this.manager.migrateHostAwayFromBot(this.room);
+          if (newHost) this.log.info({ newHost, from: this.sessionId }, 'hostMigrated');
           this.broadcastState();
           maybeRunBotTurn(this.room, {
             onAfterMove: () => { this.broadcastState(); this.onAfterCommit(); },

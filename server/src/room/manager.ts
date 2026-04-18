@@ -293,6 +293,30 @@ export class RoomManager {
     this.emitRoomUpdated(room);
   }
 
+  // Hand the host role to another human when the current host is bot-
+  // controlled (i.e. disconnected past grace). Spec line 235 in the Section 3
+  // design doc defers to Section 4's migration rule here. Returns the new
+  // hostSessionId if a migration happened, else null. No-op if the host seat
+  // is still live, or no eligible non-bot human exists.
+  migrateHostAwayFromBot(room: Room): string | null {
+    const host = room.slots.find(
+      (s): s is Extract<Room['slots'][number], { kind: 'human' }> =>
+        s.kind === 'human' && s.sessionId === room.hostSessionId,
+    );
+    if (!host || !host.botControlled) return null;
+    const eligible = room.slots
+      .filter((s): s is Extract<Room['slots'][number], { kind: 'human' }> =>
+        s.kind === 'human'
+        && s.sessionId !== room.hostSessionId
+        && !s.botControlled,
+      )
+      .sort((a, b) => a.joinedAt - b.joinedAt);
+    const next = eligible[0];
+    if (!next) return null;
+    room.hostSessionId = next.sessionId;
+    return next.sessionId;
+  }
+
   private scheduleIdle(room: Room): void {
     if (room.phase !== 'waiting') return;
     this.clearIdleTimer(room);
