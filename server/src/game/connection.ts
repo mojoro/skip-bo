@@ -191,11 +191,11 @@ export class GameConnection implements RegisteredConnection {
           conn.send(msg);
         } catch { /* ignore */ }
       });
+      // finishGame synchronously emits `roomClosed`, which the index.ts
+      // subscriber turns into a 4005 close on every socket in the room. The
+      // ws library serializes the already-queued `gameEnded` frame before
+      // the close frame, so clients receive both in order without a timer.
       this.manager.finishGame(this.room.id, 'winner');
-      const handle = setTimeout(() => {
-        this.registry.forEachInRoom(this.room.id, (conn) => conn.close(4005, 'game ended'));
-      }, 150);
-      handle.unref();
       return;
     }
     maybeRunBotTurn(this.room, {
