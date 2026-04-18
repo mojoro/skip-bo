@@ -12,9 +12,12 @@ export interface ShutdownOptions {
   roomManager?: RoomManager;
   upgrade?: GameUpgradeHandler;
   drainMs?: number;
+  // Tests inject a no-op to avoid terminating the vitest worker.
+  onExit?: (code: number) => void;
 }
 
 export function installShutdown(opts: ShutdownOptions): (code: number) => Promise<void> {
+  const onExit = opts.onExit ?? ((code: number) => process.exit(code));
   let inProgress = false;
 
   async function shutdown(code: number): Promise<void> {
@@ -22,11 +25,13 @@ export function installShutdown(opts: ShutdownOptions): (code: number) => Promis
     inProgress = true;
     logger.info({ code }, 'shutdown starting');
 
+    // Stop accepting new WS upgrades first, then tell connected clients to
+    // close. `http.Server.close()` does not terminate sockets upgraded to
+    // WebSocket (Node issue #53536), so if we awaited it before broadcasting
+    // close frames the promise would never resolve under live traffic.
     if (opts.upgrade) {
       opts.upgrade.close();
     }
-
-    await new Promise<void>((resolve) => opts.httpServer.close(() => resolve()));
 
     if (opts.gameRegistry) {
       opts.gameRegistry.broadcastCloseAll(1001, 'shutdown');
@@ -49,9 +54,11 @@ export function installShutdown(opts: ShutdownOptions): (code: number) => Promis
     const drain = opts.drainMs ?? 5_000;
     await new Promise((r) => setTimeout(r, drain));
 
+    await new Promise<void>((resolve) => opts.httpServer.close(() => resolve()));
+
     logger.info({ code }, 'shutdown complete');
     logger.flush();
-    setImmediate(() => process.exit(code));
+    setImmediate(() => onExit(code));
   }
 
   process.on('SIGTERM', () => void shutdown(0));
@@ -59,12 +66,12 @@ export function installShutdown(opts: ShutdownOptions): (code: number) => Promis
   process.on('uncaughtException', (err) => {
     logger.fatal({ err }, 'uncaught exception');
     logger.flush();
-    process.exit(1);
+    onExit(1);
   });
   process.on('unhandledRejection', (reason) => {
     logger.fatal({ reason }, 'unhandled rejection');
     logger.flush();
-    process.exit(1);
+    onExit(1);
   });
 
   return shutdown;
