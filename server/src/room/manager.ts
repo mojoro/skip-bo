@@ -29,6 +29,7 @@ export class RoomManager {
   private readonly rooms = new Map<string, Room>();
   private readonly codeIndex = new Map<string, string>();
   private readonly sessionIndex = new Map<string, string>();
+  private _allowPostDeleteEmit = false;
 
   create(input: CreateRoomInput): { room: Room } {
     if (this.sessionIndex.has(input.sessionId)) {
@@ -231,6 +232,7 @@ export class RoomManager {
     const room = this.requireRoom(roomId);
     if (room.phase !== 'playing') return;
     markFinished(room, reason);
+    this.clearIdleTimer(room);
     this.scheduleCleanup(room);
     this.emitRoomRemoved(room);
   }
@@ -274,7 +276,7 @@ export class RoomManager {
     }, FINISH_CLEANUP_MS);
   }
 
-  private deleteRoom(room: Room, _opts: { reason: 'idle' | 'postGame' | 'empty' }): void {
+  private deleteRoom(room: Room, opts: { reason: 'idle' | 'postGame' | 'empty' }): void {
     this.rooms.delete(room.id);
     this.codeIndex.delete(room.code);
     for (const slot of room.slots) {
@@ -285,13 +287,24 @@ export class RoomManager {
       clearTimeout(room.cleanupTimer);
       room.cleanupTimer = null;
     }
-    this.emitRoomRemoved(room);
+    for (const slot of room.slots) {
+      if (slot.kind === 'human' && slot.graceTimer) {
+        clearTimeout(slot.graceTimer);
+        slot.graceTimer = null;
+        slot.graceDeadline = null;
+      }
+    }
+    // postGame rooms were already removed from the lobby by finishGame — don't double-emit.
+    if (opts.reason !== 'postGame') {
+      this._allowPostDeleteEmit = true;
+      try { this.emitRoomRemoved(room); } finally { this._allowPostDeleteEmit = false; }
+    }
   }
 
   private emitRoomRemoved(room: Room): void {
-    if (room.visibility === 'public') {
-      this.events.emit('roomRemoved', { type: 'roomRemoved', roomId: room.id });
-    }
+    if (room.visibility !== 'public') return;
+    if (!this.rooms.has(room.id) && !this._allowPostDeleteEmit) return;
+    this.events.emit('roomRemoved', { type: 'roomRemoved', roomId: room.id });
   }
 
   private requireRoom(roomId: string): Room {

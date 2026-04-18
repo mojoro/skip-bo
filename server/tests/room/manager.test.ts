@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RoomManager } from '../../src/room/manager';
 import { defaultConfigForRuleset } from '@engine/types';
 import type { Room } from '../../src/types';
@@ -171,5 +171,28 @@ describe('RoomManager join/leave/slots', () => {
     mgr.addMember(host.id, { sessionId: 's2', playerName: 'P2' });
     mgr.setSlot(host.id, 1, { kind: 'open' }, { actorSessionId: 'host' });
     expect(host.kickedSessionIds.has('s2')).toBe(true);
+  });
+});
+
+describe('RoomManager roomRemoved dedup', () => {
+  it('emits roomRemoved exactly once when finish then cleanup runs', async () => {
+    vi.useFakeTimers();
+    try {
+      const mgr = new RoomManager();
+      const removed: string[] = [];
+      mgr.events.on('roomRemoved', (e) => removed.push(e.roomId));
+      const { room } = mgr.create({
+        sessionId: 's1', playerName: 'Host',
+        config: { ruleset: 'recommended', stockPileSize: 20, handSize: 5, bidirectionalBuild: true, maxPlayers: 2, partnership: null },
+        allowAiFill: true, visibility: 'public',
+      });
+      mgr.addMember(room.id, { sessionId: 's2', playerName: 'P2' });
+      mgr.startGame(room.id, { actorSessionId: 's1' }); // first roomRemoved (lobby leave)
+      mgr.finishGame(room.id, 'winner');                 // second emit
+      vi.advanceTimersByTime(6 * 60 * 1000);             // fire cleanup timer
+      expect(removed.filter((id) => id === room.id)).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
