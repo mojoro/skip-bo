@@ -6,6 +6,7 @@ import { RoomManager } from '../../src/room/manager';
 import { LobbyStreamRegistry } from '../../src/sse/registry';
 import { GameRegistry } from '../../src/game/registry';
 import { createGameUpgradeHandler } from '../../src/game/handshake';
+import { __setGraceMsForTest } from '../../src/game/grace';
 
 async function startHarness() {
   const mgr = new RoomManager();
@@ -14,6 +15,12 @@ async function startHarness() {
   const { httpServer, router } = buildHttpServer({ roomManager: mgr, corsOrigin: '*' });
   mountRoutes(router, mgr, { registry });
   httpServer.on('upgrade', createGameUpgradeHandler({ manager: mgr, registry: gameRegistry, corsOrigin: '*' }).handleUpgrade);
+  // Mirror the production wiring: roomClosed → close every game socket 4005.
+  // Without this the end-of-game test path leaks the subscriber that
+  // server/src/index.ts installs.
+  mgr.onRoomClosed((roomId) => {
+    gameRegistry.forEachInRoom(roomId, (conn) => conn.close(4005, 'room closed'));
+  });
   await new Promise<void>((r) => httpServer.listen(0, r));
   const { port } = httpServer.address() as AddressInfo;
   return {
@@ -23,20 +30,23 @@ async function startHarness() {
   };
 }
 
-async function startRoom(h: Awaited<ReturnType<typeof startHarness>>) {
+async function startRoom(
+  h: Awaited<ReturnType<typeof startHarness>>,
+  bearers: { host: string; guest: string } = { host: 'host', guest: 'guest' },
+) {
   const create = await fetch(`${h.base}/v1/rooms`, {
     method: 'POST',
-    headers: { authorization: 'Bearer host', 'content-type': 'application/json' },
+    headers: { authorization: `Bearer ${bearers.host}`, 'content-type': 'application/json' },
     body: JSON.stringify({ playerName: 'Host', config: { ruleset: 'recommended', stockPileSize: 10, handSize: 5, bidirectionalBuild: true, maxPlayers: 2, partnership: null }, allowAiFill: false, visibility: 'public' }),
   });
   const { roomId } = (await create.json()) as { roomId: string };
   await fetch(`${h.base}/v1/rooms/${roomId}/members`, {
     method: 'POST',
-    headers: { authorization: 'Bearer guest', 'content-type': 'application/json' },
+    headers: { authorization: `Bearer ${bearers.guest}`, 'content-type': 'application/json' },
     body: JSON.stringify({ playerName: 'Guest' }),
   });
-  await fetch(`${h.base}/v1/rooms/${roomId}/game`, { method: 'POST', headers: { authorization: 'Bearer host' } });
-  return roomId;
+  await fetch(`${h.base}/v1/rooms/${roomId}/game`, { method: 'POST', headers: { authorization: `Bearer ${bearers.host}` } });
+  return { roomId, host: bearers.host, guest: bearers.guest };
 }
 
 function open(wsBase: string, roomId: string, sessionId: string): Promise<{ ws: WebSocket; hello: any }> {
@@ -62,13 +72,23 @@ function nextJson(ws: WebSocket, pred: (m: any) => boolean, timeoutMs = 3000): P
   });
 }
 
+async function waitForClose(ws: WebSocket, timeoutMs = 3000): Promise<{ code: number }> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('close timeout')), timeoutMs);
+    ws.once('close', (code) => { clearTimeout(t); resolve({ code }); });
+  });
+}
+
 describe('game ws full flow', () => {
   let h: Awaited<ReturnType<typeof startHarness>>;
-  afterEach(async () => { if (h) await h.close(); });
+  afterEach(async () => {
+    __setGraceMsForTest(null);
+    if (h) await h.close();
+  });
 
   it('two clients exchange chat and see presence changes after disconnect', async () => {
     h = await startHarness();
-    const roomId = await startRoom(h);
+    const { roomId } = await startRoom(h);
     const host = await open(h.wsBase, roomId, 'host');
     const guest = await open(h.wsBase, roomId, 'guest');
     expect(host.hello.type).toBe('hello');
@@ -96,5 +116,62 @@ describe('game ws full flow', () => {
 
     hostReconnect.ws.close();
     guest.ws.close();
+  });
+
+  it('grace expiry flips host seat to botControlled and the bot plays a turn', async () => {
+    // Shrinking the grace window keeps the test real-time: handleClose still
+    // runs the actual startGrace + maybeRunBotTurn pipeline, just on a 150 ms
+    // budget so we don't sit on the 60 s production default.
+    __setGraceMsForTest(150);
+    h = await startHarness();
+    const { roomId } = await startRoom(h, { host: 'grace-host', guest: 'grace-guest' });
+    // Pin the current player to the host's seat so maybeRunBotTurn has
+    // something to do when grace expires. The recommended ruleset picks the
+    // starting player by top-of-stock comparison; without pinning we'd flake
+    // every time the guest happened to draw highest.
+    const room = h.mgr.get(roomId)!;
+    const hostPlayerIndex = room.game!.players.findIndex((p) => p.id === 'grace-host');
+    room.game!.currentPlayerIndex = hostPlayerIndex;
+    room.game!.stateVersion += 1;
+    const host = await open(h.wsBase, roomId, 'grace-host');
+    const guest = await open(h.wsBase, roomId, 'grace-guest');
+    const initialVersion = (guest.hello as { stateVersion: number }).stateVersion;
+    expect(host.hello.type).toBe('hello');
+
+    host.ws.close();
+
+    // First the disconnect ticks a state with graceDeadline set, then the
+    // timer expires and botControlled flips, then maybeRunBotTurn fires 800 ms
+    // later and bumps stateVersion — three distinct state broadcasts.
+    const botSeat = await nextJson(
+      guest.ws,
+      (m) => m.type === 'state' && m.view.seats.some((s: any) => s.name === 'Host' && s.botControlled === true),
+      2000,
+    );
+    expect(botSeat).toBeTruthy();
+
+    const botMove = await nextJson(
+      guest.ws,
+      (m) => m.type === 'state' && m.stateVersion > initialVersion,
+      2000,
+    );
+    expect(botMove.stateVersion).toBeGreaterThan(initialVersion);
+
+    guest.ws.close();
+  });
+
+  it('finishGame drives roomClosed which closes every game socket with 4005', async () => {
+    // Reviewer I-4: the 4005 close path is owned by the roomClosed subscriber
+    // wired in server/src/index.ts. Proving it here pins that contract so a
+    // future refactor that moves or removes the subscriber trips this test.
+    h = await startHarness();
+    const { roomId } = await startRoom(h, { host: 'end-host', guest: 'end-guest' });
+    const host = await open(h.wsBase, roomId, 'end-host');
+    const guest = await open(h.wsBase, roomId, 'end-guest');
+
+    h.mgr.finishGame(roomId, 'winner');
+    const [hostClose, guestClose] = await Promise.all([waitForClose(host.ws), waitForClose(guest.ws)]);
+    expect(hostClose.code).toBe(4005);
+    expect(guestClose.code).toBe(4005);
   });
 });
