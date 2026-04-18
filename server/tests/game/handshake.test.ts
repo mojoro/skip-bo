@@ -81,6 +81,25 @@ describe('game ws handshake', () => {
     expect(res.code).toBe(4003);
   });
 
+  it('waiting-phase connection gets a non-terminal 4006, not 4003', async () => {
+    h = await startHarness();
+    // Separate bearer so the shared createRoom rate-limit bucket — keyed on
+    // bearer+remoteAddress, follow-up #9 in CLAUDE.md — doesn't starve the
+    // next test when this one also creates a room.
+    const create = await fetch(`${h.base}/v1/rooms`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer wait-host', 'content-type': 'application/json' },
+      body: JSON.stringify({ playerName: 'Host', config: { ruleset: 'recommended', stockPileSize: 10, handSize: 5, bidirectionalBuild: true, maxPlayers: 2, partnership: null }, allowAiFill: false, visibility: 'public' }),
+    });
+    const { roomId } = (await create.json()) as { roomId: string };
+    // Valid session + real room, but the host has not started yet — the
+    // client races the "Start Game" click. Closing 4003 would flip this to
+    // terminal client-side, so we use 4006 to signal "retry after backoff".
+    const ws = new WebSocket(`${h.wsBase}/rooms/${roomId}/game?sessionId=wait-host`);
+    const res = await waitForClose(ws);
+    expect(res.code).toBe(4006);
+  });
+
   it('duplicate session closes the older socket with 4004', async () => {
     h = await startHarness();
     const { roomId, host } = await startGameAndGetRoomId(h);

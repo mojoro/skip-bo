@@ -63,9 +63,9 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): GameUpgradeHandle
 
       const room = deps.manager.get(roomId);
       const mappedRoomId = deps.manager.sessionRoomId(sessionId);
-      const valid = room && mappedRoomId === roomId && room.phase === 'playing';
+      const sessionMismatch = !room || mappedRoomId !== roomId;
 
-      if (!valid) {
+      if (sessionMismatch) {
         wss.handleUpgrade(req, socket, head, (ws) => {
           socket.removeListener('error', onSocketError);
           ws.close(4003, 'invalid session');
@@ -73,7 +73,19 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): GameUpgradeHandle
         return;
       }
 
-      const slotIndex = room!.slots.findIndex((s) => s.kind === 'human' && s.sessionId === sessionId);
+      // Phase mismatch is timing, not identity — the host may have pressed
+      // "Start" a moment ago, or the game may have just ended. Use 4006 so
+      // the client's terminal-code set lets it retry after backoff instead
+      // of freezing on a "Connection closed" screen.
+      if (room.phase !== 'playing') {
+        wss.handleUpgrade(req, socket, head, (ws) => {
+          socket.removeListener('error', onSocketError);
+          ws.close(4006, 'room not playing');
+        });
+        return;
+      }
+
+      const slotIndex = room.slots.findIndex((s) => s.kind === 'human' && s.sessionId === sessionId);
       if (slotIndex < 0) {
         wss.handleUpgrade(req, socket, head, (ws) => {
           socket.removeListener('error', onSocketError);
@@ -91,7 +103,7 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): GameUpgradeHandle
       wss.handleUpgrade(req, socket, head, (ws) => {
         socket.removeListener('error', onSocketError);
         new GameConnection({
-          ws, room: room!, sessionId, slotIndex,
+          ws, room, sessionId, slotIndex,
           manager: deps.manager, registry: deps.registry,
         });
       });
