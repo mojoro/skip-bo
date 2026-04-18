@@ -56,7 +56,10 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): (req: IncomingMes
       }
 
       const existing = deps.registry.findBySession(roomId, sessionId);
-      if (existing) existing.close(4004, 'duplicate session');
+      if (existing) {
+        deps.registry.remove(roomId, existing);
+        existing.close(4004, 'duplicate session');
+      }
 
       wss.handleUpgrade(req, socket, head, (ws) => {
         new GameConnection({
