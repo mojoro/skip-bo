@@ -23,6 +23,7 @@ Section 4 (Room Manager & Lobby) is designed, specced, and implemented as the `s
 10. Root-level `.dockerignore` is missing — `docker compose build` at context `..` will send the entire repo (`node_modules`, `.next`, `.git`) to the Docker daemon. Add a root `.dockerignore` before first real image build.
 11. Full-flow integration test reads raw SSE chunks with `.includes(...)` rather than accumulating a `\n\n`-delimited event buffer — works today, fragile if the server ever coalesces writes; `reader.cancel()` + `httpServer.close()` also aren't awaited at teardown.
 12. Plan text for ring-buffer `since(lastId)` at ~line 2810 still has the `-1` that was fixed in code — the plan markdown is the last inconsistency.
+13. Root `tsconfig.json` picks up `server/` TS files but doesn't know the `@engine/*` alias (that lives in `server/tsconfig.json`). Either exclude `server/` from the root tsconfig or teach it the alias.
 
 **State:** server suite 69/69 passing, main-app suite 60/60 passing, typecheck clean.
 
@@ -32,7 +33,8 @@ Section 4 (Room Manager & Lobby) is designed, specced, and implemented as the `s
 - **UI (done, single-player hot-seat):** desktop tabletop layout (green felt + wood frame, seats around the table) for 2-4 players; compact stacked layout (opponents scroll above, active zone pinned bottom) on mobile always and desktop when 5+ players. Mattel-style card palette. Responsive via Tailwind `md` breakpoint + runtime player-count check.
 - **Drag and drop (done):** custom stack under `src/lib/dnd/` — no library. Pointer Events with movement threshold, imperative transform on a floating ghost, rect-based hit-test, Escape cancels. `DragDropProvider` / `useDraggable` / `useDroppable`.
 - **Modals (done):** `NewGameModal`, `RulesetInfo`, `ConfirmDialog` (end-turn confirm), `WildDirectionPicker` (inline asc/desc choice, replaces a `window.confirm`).
-- **Networking (not started):** design locked in `docs/design-session-progress.md`. Server, client WS hook, lobby, rooms — all still to build.
+- **Networking — Room Manager + Lobby (done):** `server/` package with REST (rooms/members/slots/game), SSE lobby stream with snapshot+deltas+heartbeat, in-memory `RoomManager` (idle + post-game cleanup, host migration), Zod schemas, Problem+JSON errors, token-bucket rate limits, graceful shutdown, esbuild+pm2+Dockerfile. 69 Vitest tests including a full-flow integration test. OpenAPI 3.1 spec at `server/openapi.yaml`.
+- **Networking — game WebSocket + client hook (not started):** Section 3 design is approved; integration stubs (close codes, 60s grace window, 1001 broadcast on shutdown) already present in `server/` ready for the WS layer to fill in.
 
 ## Stack
 
