@@ -1,7 +1,8 @@
-import type { PlayerView } from '@engine/engine';
+import type { OpponentView, PlayerView } from '@engine/engine';
 import { getPlayerView } from '@engine/engine';
-import type { GameConfig } from '@engine/types';
+import type { Card, GameConfig, PartnershipRules, PlayerState, BuildPile, GamePhase, TurnPhase } from '@engine/types';
 import type { Room, Slot } from '../types';
+import { slotIndexForPlayerId } from './mapping';
 
 export interface GameViewSeat {
   slotIndex: number;
@@ -12,22 +13,65 @@ export interface GameViewSeat {
   botControlled: boolean;
 }
 
-export type PublicGameConfig = Omit<GameConfig, 'seed'>;
-
-export type PublicPlayerView = Omit<PlayerView, 'config'> & {
-  config: PublicGameConfig;
+export type PublicPartnershipRules = Omit<PartnershipRules, 'teams'> & {
+  teams: number[][];
 };
+
+export type PublicGameConfig = Omit<GameConfig, 'seed' | 'partnership'> & {
+  partnership: PublicPartnershipRules | null;
+};
+
+export interface PublicOpponentView {
+  slotIndex: number;
+  name: string;
+  handCount: number;
+  stockCount: number;
+  stockTop: Card | null;
+  discardPiles: Card[][];
+}
+
+export interface PublicPlayerView {
+  config: PublicGameConfig;
+  phase: GamePhase;
+  turnPhase: TurnPhase;
+  currentPlayerSlotIndex: number;
+  youSlotIndex: number;
+  winningTeamIndex: number | null;
+  stateVersion: number;
+  buildPiles: BuildPile[];
+  drawPileCount: number;
+  you: PlayerState;
+  opponents: PublicOpponentView[];
+}
 
 export interface GameView {
   view: PublicPlayerView;
   seats: GameViewSeat[];
 }
 
-function stripSeed(config: GameConfig): PublicGameConfig {
-  // `config.seed` deterministically drives shuffle + per-action RNG. Exposing it
-  // to any connected client lets them reconstruct every opponent's hidden state.
-  const { seed: _seed, ...rest } = config;
-  return rest;
+function publicizeConfig(room: Room, config: GameConfig): PublicGameConfig {
+  // `config.seed` drives the shuffle + per-action RNG — exposing it lets any
+  // client reconstruct every opponent's hidden hand/stock. Partnership teams
+  // store engine player ids, which for humans are sessionIds; broadcasting
+  // them hands an attacker the keys to take over any seat on reconnect.
+  const { seed: _seed, partnership, ...rest } = config;
+  let publicPartnership: PublicPartnershipRules | null = null;
+  if (partnership) {
+    publicPartnership = {
+      ...partnership,
+      teams: partnership.teams.map((team) =>
+        team.map((id) => slotIndexForPlayerId(room, id)),
+      ),
+    };
+  }
+  return { ...rest, partnership: publicPartnership };
+}
+
+function publicizeOpponents(room: Room, raw: OpponentView[]): PublicOpponentView[] {
+  return raw.map((op) => {
+    const { id: _id, ...rest } = op;
+    return { ...rest, slotIndex: slotIndexForPlayerId(room, op.id) };
+  });
 }
 
 export function buildSeats(room: Room): GameViewSeat[] {
@@ -76,6 +120,24 @@ export function buildSeats(room: Room): GameViewSeat[] {
 export function buildGameView(room: Room, sessionId: string, seats?: GameViewSeat[]): GameView {
   if (!room.game) throw new Error('buildGameView: room has no game');
   const raw = getPlayerView(room.game, sessionId);
-  const view: PublicPlayerView = { ...raw, config: stripSeed(raw.config) };
+  const you = raw.you;
+  const currentPlayer = room.game.players[raw.currentPlayerIndex];
+  const currentPlayerSlotIndex = currentPlayer
+    ? slotIndexForPlayerId(room, currentPlayer.id)
+    : -1;
+  const youSlotIndex = slotIndexForPlayerId(room, you.id);
+  const view: PublicPlayerView = {
+    config: publicizeConfig(room, raw.config),
+    phase: raw.phase,
+    turnPhase: raw.turnPhase,
+    currentPlayerSlotIndex,
+    youSlotIndex,
+    winningTeamIndex: raw.winningTeamIndex,
+    stateVersion: raw.stateVersion,
+    buildPiles: raw.buildPiles,
+    drawPileCount: raw.drawPileCount,
+    you,
+    opponents: publicizeOpponents(room, raw.opponents),
+  };
   return { view, seats: seats ?? buildSeats(room) };
 }

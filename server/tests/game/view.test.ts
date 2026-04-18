@@ -68,7 +68,7 @@ describe('buildGameView', () => {
       graceDeadline: null,
       botControlled: false,
     });
-    expect(view.view.youIndex).toBe(0);
+    expect(view.view.youSlotIndex).toBe(0);
   });
 
   it('throws if sessionId has no matching engine player', () => {

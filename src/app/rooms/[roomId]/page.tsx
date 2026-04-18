@@ -33,7 +33,7 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
         <span>room {roomId}</span>
         <span>status {socket.status}</span>
         <span>v{socket.stateVersion}</span>
-        <span>turn: slot {socket.view.view.currentPlayerIndex}</span>
+        <span>turn: slot {socket.view.view.currentPlayerSlotIndex}</span>
       </header>
       <section>
         <h2 className="font-semibold mb-2">Seats</h2>

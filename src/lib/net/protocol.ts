@@ -1,7 +1,7 @@
-import type { GameAction, GameConfig, GameState, PlayerState, CardValue } from '@/lib/game/types';
+import type { GameAction, GameConfig, GameState, PartnershipRules, PlayerState, CardValue } from '@/lib/game/types';
 
 export interface OpponentView {
-  id: string;
+  slotIndex: number;
   name: string;
   handCount: number;
   stockCount: number;
@@ -9,21 +9,26 @@ export interface OpponentView {
   discardPiles: { id: string; value: CardValue }[][];
 }
 
-// `seed` is stripped server-side: exposing it lets any client reconstruct the
-// full shuffled deck and every opponent's hidden hand / stock. See
-// `server/src/game/view.ts#stripSeed`.
-export type PublicGameConfig = Omit<GameConfig, 'seed'>;
+// Wire config omits the shuffle seed (would reveal every opponent's hand) and
+// rewrites partnership team memberships from engine player ids (which for
+// humans are sessionIds) to slot indices. See `server/src/game/view.ts`.
+export type PublicPartnershipRules = Omit<PartnershipRules, 'teams'> & {
+  teams: number[][];
+};
+export type PublicGameConfig = Omit<GameConfig, 'seed' | 'partnership'> & {
+  partnership: PublicPartnershipRules | null;
+};
 
 export interface PlayerView {
   config: PublicGameConfig;
   phase: GameState['phase'];
   turnPhase: GameState['turnPhase'];
-  currentPlayerIndex: number;
+  currentPlayerSlotIndex: number;
+  youSlotIndex: number;
   winningTeamIndex: number | null;
   stateVersion: number;
   buildPiles: GameState['buildPiles'];
   drawPileCount: number;
-  youIndex: number;
   you: PlayerState;
   opponents: OpponentView[];
 }
