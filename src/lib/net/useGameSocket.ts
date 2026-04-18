@@ -46,8 +46,14 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const connect = useCallback(() => {
+    // Match the page's protocol. Without this, a Next.js app served over HTTPS
+    // that tries to open `ws://` gets blocked as mixed content by every modern
+    // browser — the whole networked game would stop working on the production
+    // deploy while still working on localhost.
     const base = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_GAME_WS_URL)
-      || (typeof window !== 'undefined' ? `ws://${window.location.host}` : '');
+      || (typeof window !== 'undefined'
+          ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
+          : '');
     const url = `${base}/rooms/${encodeURIComponent(roomId)}/game?sessionId=${encodeURIComponent(sessionId)}`;
     setStatus((prev) => (prev === 'closed' ? prev : (attemptRef.current === 0 ? 'connecting' : 'reconnecting')));
     const ws = new WebSocket(url);
