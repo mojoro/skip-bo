@@ -54,6 +54,7 @@ export class RoomManager {
       kickedSessionIds: new Set(),
       idleTimer: null,
       cleanupTimer: null,
+      botPending: new Set<number>(),
     };
     this.rooms.set(id, room);
     this.codeIndex.set(code, id);
@@ -112,6 +113,9 @@ export class RoomManager {
       name: input.playerName,
       connected: false,
       joinedAt: Date.now(),
+      graceDeadline: null,
+      graceTimer: null,
+      botControlled: false,
     };
     this.sessionIndex.set(input.sessionId, room.id);
     this.touch(room);
@@ -327,6 +331,9 @@ export class RoomManager {
       name: input.playerName,
       connected: false,
       joinedAt: Date.now(),
+      graceDeadline: null,
+      graceTimer: null,
+      botControlled: false,
     };
     return slots;
   }

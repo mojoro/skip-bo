@@ -12,7 +12,7 @@ describe('slot helpers', () => {
   it('summarizes a mix of slot kinds', () => {
     const room = makeRoom();
     room.slots = [
-      { kind: 'human', sessionId: 'a', name: 'A', connected: true, joinedAt: 0 },
+      { kind: 'human', sessionId: 'a', name: 'A', connected: true, joinedAt: 0, graceDeadline: null, graceTimer: null, botControlled: false },
       { kind: 'ai', botId: 'b1', difficulty: 'easy' },
       { kind: 'open' },
       { kind: 'locked' },
@@ -25,8 +25,8 @@ describe('slot helpers', () => {
   it('counts connected and disconnected humans together', () => {
     const room = makeRoom();
     room.slots = [
-      { kind: 'human', sessionId: 'a', name: 'A', connected: true, joinedAt: 0 },
-      { kind: 'human', sessionId: 'b', name: 'B', connected: false, joinedAt: 1 },
+      { kind: 'human', sessionId: 'a', name: 'A', connected: true, joinedAt: 0, graceDeadline: null, graceTimer: null, botControlled: false },
+      { kind: 'human', sessionId: 'b', name: 'B', connected: false, joinedAt: 1, graceDeadline: null, graceTimer: null, botControlled: false },
       { kind: 'open' }, { kind: 'open' },
     ];
     expect(countHumans(room.slots)).toBe(2);

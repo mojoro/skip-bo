@@ -17,7 +17,7 @@ export function makeRoom(overrides: Partial<Room> = {}): Room {
     config,
     allowAiFill: true,
     slots: [
-      { kind: 'human', sessionId, name: 'John', connected: true, joinedAt: now },
+      { kind: 'human', sessionId, name: 'John', connected: true, joinedAt: now, graceDeadline: null, graceTimer: null, botControlled: false },
       { kind: 'open' },
       { kind: 'open' },
       { kind: 'open' },
@@ -29,6 +29,7 @@ export function makeRoom(overrides: Partial<Room> = {}): Room {
     kickedSessionIds: new Set(),
     idleTimer: null,
     cleanupTimer: null,
+    botPending: new Set<number>(),
     ...overrides,
   };
 }
