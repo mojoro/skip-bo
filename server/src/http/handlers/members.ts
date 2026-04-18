@@ -25,7 +25,7 @@ export function postMember(mgr: RoomManager) {
         playerName: parsed.data.playerName,
       });
       res.statusCode = 201;
-      res.setHeader('location', `${instance}/${session}`);
+      res.setHeader('location', `${instance}/${encodeURIComponent(session)}`);
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify({
         room: projectRoomInfo(room, { context: 'direct' }),
