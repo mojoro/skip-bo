@@ -17,6 +17,7 @@ export function startGrace(room: Room, slotIndex: number, opts: StartGraceOpts):
     slot.botControlled = true;
     opts.onExpire();
   }, GRACE_MS);
+  slot.graceTimer.unref();
 }
 
 export function cancelGrace(room: Room, slotIndex: number): void {

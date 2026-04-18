@@ -180,9 +180,10 @@ export class GameConnection implements RegisteredConnection {
         } catch { /* ignore */ }
       });
       this.manager.finishGame(this.room.id, 'winner');
-      setTimeout(() => {
+      const handle = setTimeout(() => {
         this.registry.forEachInRoom(this.room.id, (conn) => conn.close(4005, 'game ended'));
       }, 150);
+      handle.unref();
       return;
     }
     maybeRunBotTurn(this.room, {
@@ -203,6 +204,7 @@ export class GameConnection implements RegisteredConnection {
       this.isAlive = false;
       try { this.ws.ping(); } catch { /* ignore */ }
     }, HEARTBEAT_MS);
+    this.heartbeatTimer.unref();
   }
 
   private handleClose(code: number, reason: string): void {

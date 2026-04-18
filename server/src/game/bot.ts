@@ -21,7 +21,7 @@ export function maybeRunBotTurn(room: Room, deps: BotDeps): void {
   if (!isBotSeat) return;
   if (room.botPending.has(slotIndex)) return;
   room.botPending.add(slotIndex);
-  setTimeout(() => {
+  const handle = setTimeout(() => {
     room.botPending.delete(slotIndex);
     if (room.phase !== 'playing' || !room.game) return;
     if (currentPlayerSlotIndex(room) !== slotIndex) return;
@@ -32,6 +32,7 @@ export function maybeRunBotTurn(room: Room, deps: BotDeps): void {
     room.game = result.state;
     deps.onAfterMove();
   }, BOT_MOVE_DELAY_MS);
+  handle.unref();
 }
 
 export function pickRandomLegalAction(state: GameState): GameAction | null {
