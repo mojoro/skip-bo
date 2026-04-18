@@ -10,6 +10,7 @@ import type { RoomManager } from '../room/manager';
 import { postRoom, listRooms, getRoom, patchRoom } from './handlers/rooms';
 import { postMember, deleteMember } from './handlers/members';
 import { putSlot } from './handlers/slots';
+import { postGame } from './handlers/game';
 
 export interface BuildOptions {
   roomManager: RoomManager;
@@ -62,4 +63,5 @@ export function mountRoutes(router: Router, mgr: RoomManager): void {
   router.add('POST', '/v1/rooms/:id/members', postMember(mgr));
   router.add('DELETE', '/v1/rooms/:id/members/:sessionId', deleteMember(mgr));
   router.add('PUT', '/v1/rooms/:id/slots/:index', putSlot(mgr));
+  router.add('POST', '/v1/rooms/:id/game', postGame(mgr));
 }
