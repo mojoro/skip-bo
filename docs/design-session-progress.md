@@ -23,7 +23,9 @@ A full offline hot-seat demo was built between brainstorming Section 3 and retur
 
 - **Room Manager + Lobby (Section 4)** — designed, specced, and **implemented** as `server/`. Plan: `docs/superpowers/plans/2026-04-17-room-manager-lobby.md`. REST endpoints (Zalando-aligned, versioned `/v1/`), SSE lobby stream with deltas, host-controlled slots, 30-min idle + 5-min post-game cleanup, pm2 supervision + graceful shutdown, Problem+JSON errors, camelCase JSON, `Authorization: Bearer <sessionId>`. OpenAPI 3.1 yaml at `server/openapi.yaml`.
 
-**Still to build:** client WS hook, AI bots (Section 5), frontend architecture write-up (Section 6), AWS deploy (Section 7), testing strategy for the network layer (Section 8). UI polish list lives in `CLAUDE.md`.
+**Still to build:** AI bots (Section 5), frontend architecture write-up (Section 6), AWS deploy (Section 7), testing strategy for the network layer (Section 8). UI polish list lives in `CLAUDE.md`.
+
+- **Game WebSocket + client hook (Section 3)** — **implemented** as `server/src/game/`. Raw `ws` upgrade handler, per-socket `GameConnection`, `GameRegistry`, pure dispatch, 60s grace, bot takeover stub, full-flow integration tests. Client `useGameSocket` hook with backoff reconnect in `src/lib/net/`. Hot-seat demo moved to `/local`; `/rooms/[roomId]` renders networked state. Verified hot-seat and networked routes render correctly in mobile (390×844) and desktop (1280×800) viewports 2026-04-18.
 
 ## Project Context
 
