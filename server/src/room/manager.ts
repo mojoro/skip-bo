@@ -8,6 +8,7 @@ import {
   IDLE_MS, FINISH_CLEANUP_MS,
   migrateHost, fillOpenWithAi, initializeGameState, markFinished,
 } from './lifecycle';
+import { clearAllGraceTimers } from '../game/grace';
 
 export interface CreateRoomInput {
   sessionId: string;
@@ -233,6 +234,10 @@ export class RoomManager {
     if (room.phase !== 'playing') return;
     markFinished(room, reason);
     this.clearIdleTimer(room);
+    // Grace timers outlive the game otherwise — on expiry they'd flip a
+    // botControlled flag and queue a bot turn against a finished engine,
+    // producing a spurious broadcast and noisy logs.
+    clearAllGraceTimers(room);
     this.scheduleCleanup(room);
     this.emitRoomRemoved(room);
   }
