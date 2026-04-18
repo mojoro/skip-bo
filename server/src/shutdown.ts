@@ -50,18 +50,21 @@ export function installShutdown(opts: ShutdownOptions): (code: number) => Promis
     await new Promise((r) => setTimeout(r, drain));
 
     logger.info({ code }, 'shutdown complete');
-    process.exit(code);
+    logger.flush();
+    setImmediate(() => process.exit(code));
   }
 
   process.on('SIGTERM', () => void shutdown(0));
   process.on('SIGINT', () => void shutdown(0));
   process.on('uncaughtException', (err) => {
     logger.fatal({ err }, 'uncaught exception');
-    void shutdown(1);
+    logger.flush();
+    process.exit(1);
   });
   process.on('unhandledRejection', (reason) => {
     logger.fatal({ reason }, 'unhandled rejection');
-    void shutdown(1);
+    logger.flush();
+    process.exit(1);
   });
 
   return shutdown;
