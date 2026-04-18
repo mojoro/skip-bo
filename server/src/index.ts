@@ -36,9 +36,9 @@ function main(): void {
   const upgrade = createGameUpgradeHandler({
     manager: roomManager, registry: gameRegistry, corsOrigin: config.corsOrigin,
   });
-  httpServer.on('upgrade', upgrade);
+  httpServer.on('upgrade', upgrade.handleUpgrade);
 
-  installShutdown({ httpServer, registry, gameRegistry, roomManager });
+  installShutdown({ httpServer, registry, gameRegistry, roomManager, upgrade });
 
   httpServer.listen(config.httpPort, () => {
     logger.info({ port: config.httpPort }, 'server listening');

@@ -13,7 +13,7 @@ async function startHarness() {
   const gameRegistry = new GameRegistry();
   const { httpServer, router } = buildHttpServer({ roomManager: mgr, corsOrigin: '*' });
   mountRoutes(router, mgr, { registry });
-  httpServer.on('upgrade', createGameUpgradeHandler({ manager: mgr, registry: gameRegistry, corsOrigin: '*' }));
+  httpServer.on('upgrade', createGameUpgradeHandler({ manager: mgr, registry: gameRegistry, corsOrigin: '*' }).handleUpgrade);
   await new Promise<void>((r) => httpServer.listen(0, r));
   const { port } = httpServer.address() as AddressInfo;
   return {

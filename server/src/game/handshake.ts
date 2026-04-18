@@ -15,9 +15,15 @@ export interface HandshakeDeps {
   corsOrigin: string;
 }
 
-export function createGameUpgradeHandler(deps: HandshakeDeps): (req: IncomingMessage, socket: Duplex, head: Buffer) => void {
+export interface GameUpgradeHandler {
+  handleUpgrade: (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
+  close: () => void;
+}
+
+export function createGameUpgradeHandler(deps: HandshakeDeps): GameUpgradeHandler {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES });
   const log = logger.child({ component: 'gameWs.handshake' });
+  let shuttingDown = false;
 
   const onSocketError = (err: Error): void => {
     log.warn({ err }, 'upgradeSocketError');
@@ -28,8 +34,13 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): (req: IncomingMes
     try { socket.destroy(); } catch { /* ignore */ }
   });
 
-  return (req, socket, head) => {
+  const handleUpgrade = (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
     socket.on('error', onSocketError);
+    if (shuttingDown) {
+      socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n');
+      socket.destroy();
+      return;
+    }
     try {
       const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
       const match = PATH_RE.exec(url.pathname);
@@ -89,4 +100,11 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): (req: IncomingMes
       try { socket.destroy(); } catch { /* ignore */ }
     }
   };
+
+  const close = (): void => {
+    shuttingDown = true;
+    wss.close();
+  };
+
+  return { handleUpgrade, close };
 }

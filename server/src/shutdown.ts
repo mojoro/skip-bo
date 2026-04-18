@@ -2,6 +2,7 @@ import type { Server } from 'node:http';
 import type { LobbyStreamRegistry } from './sse/registry';
 import type { GameRegistry } from './game/registry';
 import type { RoomManager } from './room/manager';
+import type { GameUpgradeHandler } from './game/handshake';
 import { logger } from './logger';
 
 export interface ShutdownOptions {
@@ -9,6 +10,7 @@ export interface ShutdownOptions {
   registry?: LobbyStreamRegistry;
   gameRegistry?: GameRegistry;
   roomManager?: RoomManager;
+  upgrade?: GameUpgradeHandler;
   drainMs?: number;
 }
 
@@ -19,6 +21,10 @@ export function installShutdown(opts: ShutdownOptions): (code: number) => Promis
     if (inProgress) return;
     inProgress = true;
     logger.info({ code }, 'shutdown starting');
+
+    if (opts.upgrade) {
+      opts.upgrade.close();
+    }
 
     await new Promise<void>((resolve) => opts.httpServer.close(() => resolve()));
 
