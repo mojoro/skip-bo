@@ -14,10 +14,10 @@ export default function HowToPlay({ open, onClose }: HowToPlayProps) {
       onClick={onClose}
     >
       <div
-        className="bg-zinc-800 text-zinc-100 rounded-lg shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto flex flex-col gap-4"
+        className="bg-zinc-800 text-zinc-100 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center sticky top-0 bg-zinc-800 pb-2 -mt-1">
+        <div className="flex justify-between items-center shrink-0 px-6 py-4 border-b border-zinc-700 bg-zinc-800">
           <h2 className="text-lg font-bold">How to play Skip-Bo</h2>
           <button
             onClick={onClose}
@@ -28,6 +28,7 @@ export default function HowToPlay({ open, onClose }: HowToPlayProps) {
           </button>
         </div>
 
+        <div className="overflow-y-auto px-6 py-4 flex flex-col gap-4">
         <section className="space-y-2">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--gold)]">
             Goal
@@ -133,9 +134,10 @@ export default function HowToPlay({ open, onClose }: HowToPlayProps) {
           </p>
         </section>
 
-        <div className="text-xs text-zinc-500 pt-2 border-t border-zinc-700">
-          Tap the <strong>Ruleset</strong> button to see the exact numbers for
-          this game (hand size, stock size, wild rules).
+          <div className="text-xs text-zinc-500 pt-2 border-t border-zinc-700">
+            Tap the <strong>Ruleset</strong> button to see the exact numbers
+            for this game (hand size, stock size, wild rules).
+          </div>
         </div>
       </div>
     </div>
