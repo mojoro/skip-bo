@@ -6,5 +6,5 @@
     </linearGradient>
   </defs>
   <rect x="2.5" y="2.5" width="27" height="27" rx="5.5" fill="url(#card)" stroke="#d9a441" stroke-width="1.25" />
-  <text x="16" y="22" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Arial, sans-serif" font-weight="800" font-size="14" fill="#d9a441" letter-spacing="0.5">SB</text>
+  <text x="16" y="16" text-anchor="middle" dominant-baseline="central" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Arial, sans-serif" font-weight="800" font-size="14" fill="#d9a441">SB</text>
 </svg>
