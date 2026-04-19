@@ -29,18 +29,22 @@ describe('lifecycle', () => {
     expect(mgr.get(room.id)).toBeUndefined();
   });
 
-  it('startGame rejects with <2 players and no ai fill', () => {
+  it('startGame fills open slots with AI regardless of allowAiFill', () => {
+    // Solo host at a 4-seat table with allowAiFill: false. Open seats are
+    // auto-filled with AI at start — the flag is no longer a gate.
     const { room } = mgr.create({ sessionId: 'h', playerName: 'H', config: baseConfig(), allowAiFill: false, visibility: 'public' });
-    expect(() => mgr.startGame(room.id, { actorSessionId: 'h' })).toThrow(/openSlots|tooFew/);
-  });
-
-  it('startGame fills open slots with AI when allowAiFill', () => {
-    const { room } = mgr.create({ sessionId: 'h', playerName: 'H', config: baseConfig(), allowAiFill: true, visibility: 'public' });
-    mgr.addMember(room.id, { sessionId: 'a', playerName: 'A' });
     mgr.startGame(room.id, { actorSessionId: 'h' });
     expect(room.phase).toBe('playing');
-    expect(room.game).not.toBeNull();
     expect(room.slots.every((s) => s.kind === 'human' || s.kind === 'ai')).toBe(true);
+  });
+
+  it('startGame rejects when fewer than 2 playable seats exist', () => {
+    // Solo host + all remaining seats locked — nothing to fill with AI.
+    const { room } = mgr.create({ sessionId: 'h', playerName: 'H', config: baseConfig(), allowAiFill: false, visibility: 'public' });
+    mgr.setSlot(room.id, 1, { kind: 'locked' }, { actorSessionId: 'h' });
+    mgr.setSlot(room.id, 2, { kind: 'locked' }, { actorSessionId: 'h' });
+    mgr.setSlot(room.id, 3, { kind: 'locked' }, { actorSessionId: 'h' });
+    expect(() => mgr.startGame(room.id, { actorSessionId: 'h' })).toThrow(/tooFew/);
   });
 
   it('startGame rejects non-host', () => {
@@ -118,6 +122,17 @@ describe('lifecycle', () => {
     // Neither session is still bound to the (now-finishing) room.
     expect(mgr.sessionRoomId('h')).toBeUndefined();
     expect(mgr.sessionRoomId('a')).toBeUndefined();
+  });
+
+  it('solo host starts a 2-seat room vs a bot without toggling AI fill', () => {
+    // User-reported: "one person trying to start a game with one AI
+    // results in a tooFew error". Any open seat at start converts to AI.
+    const c = defaultConfigForRuleset('recommended', 2);
+    c.maxPlayers = 2;
+    const { room } = mgr.create({ sessionId: 'h', playerName: 'H', config: c, allowAiFill: false, visibility: 'public' });
+    mgr.startGame(room.id, { actorSessionId: 'h' });
+    expect(room.phase).toBe('playing');
+    expect(room.slots[1]!.kind).toBe('ai');
   });
 
   it('startGame counts AI slots toward the 2-player minimum', () => {
