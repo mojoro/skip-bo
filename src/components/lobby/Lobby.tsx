@@ -41,7 +41,15 @@ export function Lobby({ baseUrl, sessionId, displayName, onDisplayNameChange }: 
   const inRoom = typeof myRoomId === 'string';
 
   return (
-    <main className="min-h-screen wood-frame p-4 sm:p-6">
+    <main
+      className="min-h-[100dvh] wood-frame"
+      style={{
+        paddingTop: 'max(1rem, env(safe-area-inset-top))',
+        paddingRight: 'max(1rem, env(safe-area-inset-right))',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+        paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+      }}
+    >
       <div className="felt-surface rounded-xl p-4 sm:p-8 max-w-6xl mx-auto">
         <header className="flex items-center justify-between mb-6">
           <h1 className="text-xl sm:text-2xl font-bold tracking-widest text-white">

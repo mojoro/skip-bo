@@ -124,7 +124,15 @@ export function PreGameRoom(props: PreGameRoomProps) {
   };
 
   return (
-    <main className="min-h-screen wood-frame p-4 sm:p-6">
+    <main
+      className="min-h-[100dvh] wood-frame"
+      style={{
+        paddingTop: 'max(1rem, env(safe-area-inset-top))',
+        paddingRight: 'max(1rem, env(safe-area-inset-right))',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+        paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+      }}
+    >
       <div className="felt-surface rounded-xl p-4 sm:p-8 max-w-3xl mx-auto space-y-6">
         <header className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 sm:justify-between">
           <h1 className="text-lg sm:text-xl font-bold tracking-widest text-white">WAITING ROOM</h1>

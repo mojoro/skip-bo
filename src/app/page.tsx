@@ -60,7 +60,15 @@ export default function LandingPage() {
 
 function LandingFrame({ children }: { children: React.ReactNode }) {
   return (
-    <main className="min-h-screen wood-frame flex items-center justify-center p-6">
+    <main
+      className="min-h-[100dvh] wood-frame flex items-center justify-center"
+      style={{
+        paddingTop: 'max(1.5rem, env(safe-area-inset-top))',
+        paddingRight: 'max(1.5rem, env(safe-area-inset-right))',
+        paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))',
+        paddingLeft: 'max(1.5rem, env(safe-area-inset-left))',
+      }}
+    >
       <div className="felt-surface rounded-xl p-8 max-w-md w-full">{children}</div>
     </main>
   );

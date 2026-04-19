@@ -168,7 +168,15 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
 
 function Frame({ children }: { children: ReactNode }) {
   return (
-    <main className="min-h-screen felt-surface flex items-start justify-center p-4 sm:p-10 overflow-auto">
+    <main
+      className="min-h-[100dvh] felt-surface flex items-start justify-center overflow-auto"
+      style={{
+        paddingTop: 'max(1rem, env(safe-area-inset-top))',
+        paddingRight: 'max(1rem, env(safe-area-inset-right))',
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+        paddingLeft: 'max(1rem, env(safe-area-inset-left))',
+      }}
+    >
       <div className="w-full max-w-2xl wood-frame rounded-xl p-6 sm:p-8 table-inset">
         <div className="bg-black/30 rounded-lg p-5 sm:p-6 ring-1 ring-white/5">
           {children}
