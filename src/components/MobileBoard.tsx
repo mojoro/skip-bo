@@ -70,7 +70,7 @@ export function MobileBoardView({
           <div className="flex flex-col items-center gap-0.5 shrink-0">
             {yourStockTop ? (
               <DraggableCard
-                id={`stock-${self.slotIndex}`}
+                id={`m-stock-${self.slotIndex}`}
                 source={{ from: 'stock', playerIndex: self.slotIndex }}
                 card={yourStockTop}
                 size="md"
@@ -100,7 +100,7 @@ export function MobileBoardView({
               return (
                 <DroppableZone
                   key={i}
-                  id={`build-${i}`}
+                  id={`m-build-${i}`}
                   data={{ kind: 'build', index: i }}
                   className="flex flex-col items-center gap-0.5"
                 >
@@ -155,7 +155,7 @@ export function MobileBoardView({
               ? self.handCards.map((c, i) => (
                   <DraggableCard
                     key={c.id}
-                    id={`hand-${self.slotIndex}-${i}`}
+                    id={`m-hand-${self.slotIndex}-${i}`}
                     source={{ from: 'hand', index: i }}
                     card={c as CardType}
                     size="md"
@@ -180,7 +180,7 @@ export function MobileBoardView({
               const isSelected = selection.kind === 'discard' && selection.pileIndex === i;
               const cardEl = top ? (
                 <DraggableCard
-                  id={`discard-src-${self.slotIndex}-${i}`}
+                  id={`m-discard-src-${self.slotIndex}-${i}`}
                   source={{ from: 'discard', playerIndex: self.slotIndex, pileIndex: i }}
                   disabled={selection.kind === 'hand'}
                   card={top as CardType}
@@ -204,7 +204,7 @@ export function MobileBoardView({
               return (
                 <div key={i} className="flex flex-col items-center gap-0.5">
                   <DroppableZone
-                    id={`discard-target-${self.slotIndex}-${i}`}
+                    id={`m-discard-target-${self.slotIndex}-${i}`}
                     data={{ kind: 'discard', index: i }}
                   >
                     {cardEl}
