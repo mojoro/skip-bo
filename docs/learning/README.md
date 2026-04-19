@@ -1,6 +1,6 @@
 # Skip-Bo deploy learning docs
 
-A companion to the Section 7 AWS deploy work. Each file explains one piece of the production stack in plain English: what it is, why it's there, how it fits into the system, and a short summary you can drop into an interview.
+A companion to the Section 7 AWS deploy work, **live at https://skipbo.johnmoorman.com since 2026-04-19**. Each file explains one piece of the production stack in plain English: what it is, why it's there, how it fits into the system, and a short summary you can drop into an interview.
 
 Read in order — each builds on the previous.
 

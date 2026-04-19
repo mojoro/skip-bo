@@ -95,6 +95,23 @@ location = /v1/lobby/stream {
 
 `proxy_buffering off` is the critical one. nginx's default is to buffer the upstream response and send it to the client in chunks for efficiency — which defeats the entire point of streaming. Without this line the browser receives nothing for ~30 s, then a burst of all queued events at once.
 
+## Versioning note: `listen … http2` was deprecated in 1.25
+
+Older guides show HTTP/2 enabled inline on the listen directive:
+
+```nginx
+listen 443 ssl http2;   # pre-1.25 — emits a [warn] on modern nginx
+```
+
+nginx 1.25+ split this into a standalone directive:
+
+```nginx
+listen 443 ssl;
+http2 on;               # current syntax
+```
+
+Amazon Linux 2023 ships nginx 1.28, so you'll see the deprecation warning on every reload if you use the old form. The functionality still works; only the configuration style changed.
+
 ## Location matching priority (the gotcha you'll hit)
 
 nginx evaluates `location` blocks in this order:

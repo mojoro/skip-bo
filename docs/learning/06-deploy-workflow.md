@@ -23,6 +23,8 @@ The major steps and the reasoning:
 
 **2. Docker Compose plugin.** AL2023 ships Docker but not the `compose` v2 plugin. We download the binary directly from GitHub releases into `/usr/local/lib/docker/cli-plugins/` where the Docker CLI looks for plugins. After this, `docker compose version` works.
 
+**2.5. Docker buildx plugin.** AL2023's bundled `buildx` is old (around 0.12); modern `compose` refuses to build with anything below 0.17. Symptom on the first deploy: `compose build requires buildx 0.17.0 or later` and the deploy script bails before any image builds. Fix: download the latest buildx binary from GitHub releases into the same plugins directory. The install has one quirk — buildx release asset names use `arm64`/`amd64` while `uname -m` returns `aarch64`/`x86_64`, so the bootstrap translates the architecture string before fetching.
+
 **3. Add `ec2-user` to docker group.** Without this, every `docker compose` command needs `sudo`. With it, the deploy script runs as the regular SSH user.
 
 **4. Swap file (1 GB, defensive).** On a t4g.small with 2 GB RAM, swap isn't strictly necessary — runtime sits comfortably around 600 MB — but the Next.js production build can peak at 1.5 GB of working memory. A 1 GB swap file on the gp3 root volume (no extra cost) absorbs those spikes instead of risking an OOM kill during a deploy. The `/etc/fstab` entry makes it survive reboots. If we'd picked the 1 GB t2.micro this step would be essential rather than defensive.
@@ -53,6 +55,12 @@ REMOTE_DIR=/opt/skip-bo
 ssh "$REMOTE" "cd $REMOTE_DIR && git fetch origin main && git reset --hard origin/main"
 ssh "$REMOTE" "cd $REMOTE_DIR && docker compose up -d --build"
 ssh "$REMOTE" "docker image prune -f"
+
+# Sync nginx config + reload (zero downtime).
+ssh "$REMOTE" "sudo cp $REMOTE_DIR/deploy/nginx.conf /etc/nginx/conf.d/skipbo.conf"
+ssh "$REMOTE" "sudo nginx -t"
+ssh "$REMOTE" "sudo systemctl reload nginx"
+
 sleep 5
 ssh "$REMOTE" "curl -sf http://127.0.0.1:8787/v1/rooms > /dev/null"
 ssh "$REMOTE" "curl -sf http://127.0.0.1:3000/ > /dev/null"
@@ -67,6 +75,8 @@ ssh "$REMOTE" "curl -sf http://127.0.0.1:3000/ > /dev/null"
 **`docker image prune -f`** — every rebuild leaves a previous image without a tag (a "dangling" image). They accumulate and fill the 8 GB disk. `-f` skips the confirmation prompt.
 
 **`curl -sf` health checks** — `-s` silent, `-f` fails on HTTP error. They hit `127.0.0.1` to bypass nginx and verify the containers themselves are healthy. If either fails, `set -e` halts the script with a non-zero exit code.
+
+**Why the nginx sync step.** Bootstrap installs `nginx.conf` to `/etc/nginx/conf.d/skipbo.conf` once. Without the sync step, later edits to `deploy/nginx.conf` in the repo would sit on the host unused — the system nginx config would forever be the bootstrap-time version. Syncing on every deploy means a change to nginx routing or TLS settings lands with a normal `git push && deploy.sh` cycle. `sudo nginx -t` first so a typo fails the deploy instead of breaking live serving; `systemctl reload` is a zero-downtime hot-reload.
 
 ## Why we don't use a container registry yet
 
