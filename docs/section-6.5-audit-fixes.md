@@ -20,7 +20,9 @@ Single-pass audit of branch `feature/section-6.5-lobby`, implemented by a Sonnet
 | `50dfaab` | Add Leave game button to the in-play Board header (UX round 2) |
 | `d9f1fa6` | Count explicit AI slots toward startGame player minimum (UX round 3) |
 | `4b0f99a` | Treat finished rooms as unseated in GET v1 me room (UX round 3) |
-| `8a79127` | Always fill open slots with AI at startGame so solo vs bot works (UX round 4) |
+| `8a79127` | Always fill open slots with AI at startGame so solo vs bot works (UX round 4 — superseded) |
+| `fadc3d2` | Drive bots after REST state changes so bot-first games progress (UX round 5) |
+| `22fa43f` | Restore allowAiFill gate on open-seat conversion at startGame (UX round 5) |
 
 ## Findings
 
@@ -75,8 +77,8 @@ Section 3's A1/A2 ratchet (`server/src/game/view.ts:publicizeConfig`) already sa
 
 ## Verification
 
-- Server suite: 152/152 after round 4 (was 151 after round 3, 148 after round 2, 142 after round 1, 139 before fixes; +13 regression tests).
-- Root suite: 141/141 after round 4 (one test swapped for the new solo-vs-bot scenario; total unchanged from round 3).
+- Server suite: 153/153 after round 5 (was 152 after round 4, 151 after round 3, 148 after round 2, 142 after round 1, 139 before fixes; +14 regression tests total).
+- Root suite: 142/142 after round 5 (+1 for Start button behavior).
 - Server typecheck: clean.
 - Root typecheck: still fails only on pre-existing follow-up #13 (`@engine/*` alias under `server/`), unchanged.
 - Not browser-verified: fixes are on wire-shape + server internals; existing Playwright walk-through from Task 26 still describes the UI end-to-end behavior.
@@ -159,6 +161,37 @@ New regression tests:
 **Fix.** `startGame` no longer consults `allowAiFill` at start time. Any open seat is filled with AI unconditionally. The remaining preconditions are `humans >= 1` (a room needs an owner) and `humans + ai + open >= 2` (engine needs two players). `canStart` mirrors the simpler rule; `allowAiFill` stays in the signature for API stability but is ignored. Tooltip on the Start button now says "open seats will be filled with AI" when any remain.
 
 Tests updated: the previous "rejects with <2 players and no ai fill" now tests the equivalent failure (solo host + every other seat locked). A new regression covers the user's exact flow — 2-seat room, solo host, `allowAiFill: false`, Start → playing, slot 1 is AI.
+
+**Files:** `server/src/room/manager.ts`, `server/tests/room/lifecycle.test.ts`, `src/components/room/StartButton.tsx`, `src/components/room/StartButton.test.tsx`.
+
+## Round 5 — bot-first games hang + narrowed AI-fill scope
+
+### C8 (Critical). Bot with the first turn never played
+
+**Bug.** `startGame` initialized the engine state + broadcast the opening view, but nothing kicked off `maybeRunBotTurn`. The existing bot driver was pinned inside `connection.ts:onAfterCommit`, which only runs after a human action commits or after a grace-expiry. For games where the starting player happened to be an AI seat (explicit AI or `allowAiFill` conversion), the game hung indefinitely — no state frame beyond the opening one ever arrived.
+
+**Fix.** Extracted the `onAfterCommit` logic into a free helper `driveRoomAfterStateChange(room, registry, manager)` in `server/src/game/broadcast.ts`. It handles both branches: if the engine reports a winner, fan out `gameEnded` + call `finishGame`; otherwise schedule the next bot turn whose `onAfterMove` broadcasts and recurses back into the helper. Called from two places now:
+
+- `server/src/index.ts` inside the `onRoomStateChange` subscriber, right after `broadcastRoomState`. This is the path that fires on `startGame` (and every other REST mutation that touches a playing room).
+- `server/src/game/connection.ts:onAfterCommit` — delegates to the same helper after an action commits, removing the duplicated gameEnded + bot-schedule block.
+
+`room.botPending` is the existing dedup; both entry points respect it so concurrent triggers don't double-schedule a turn.
+
+Regression: `server/tests/game/fullFlow.test.ts` now includes a test that creates a 2-seat room with an explicit AI, pins `currentPlayerIndex` to slot 1, and asserts the bot moves within the 800 ms move delay without any human action. The fullFlow harness also picks up the production `onRoomStateChange` wiring (it was missing — reason the test originally timed out).
+
+**Files:** `server/src/game/broadcast.ts`, `server/src/game/connection.ts`, `server/src/index.ts`, `server/tests/game/fullFlow.test.ts`.
+
+### C9 (Correction). Narrowed Round 4's always-fill to an explicit-AI-only rule
+
+**Bug.** Round 4's `8a79127` dropped the `allowAiFill` check from `startGame` entirely — any open seat auto-converted to AI on Start. User feedback: "if AI fill isn't checked, the lobby shouldn't fill empty slots with AI. The specific case I was referring to was that if the user explicitly set the slot to AI and tried to start the game, the game should start. `tooFew` is still a valid condition when AI fill is off and the remaining slots are just open."
+
+**Fix.** Restored the round-3 behavior: `allowAiFill` gates open-seat conversion, but explicit AI slots (set by `setSlot({ kind: 'ai' })`) count toward the playable minimum regardless. Rules:
+
+- ≥1 human must be seated.
+- `playable = humans + explicit AI + (allowAiFill ? open : 0)` must be ≥2.
+- If `open > 0 && !allowAiFill`, throw `openSlots` — host must toggle them to AI, lock them, or enable fill.
+
+`canStart` and the Start button tooltip mirror the rule. The tooltip now says "Toggle open slots to AI, lock them, or enable AI fill" when the gate fails. Replaced the round-4 "solo vs AI without toggling fill" regression with a test that explicitly toggles slot 1 to AI and starts successfully.
 
 **Files:** `server/src/room/manager.ts`, `server/tests/room/lifecycle.test.ts`, `src/components/room/StartButton.tsx`, `src/components/room/StartButton.test.tsx`.
 
