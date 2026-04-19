@@ -110,7 +110,7 @@ export function SeatView(props: SeatViewProps) {
           </div>
 
           <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
-            <div className="flex gap-1 overflow-x-auto max-w-full pb-1">
+            <div className="flex gap-1 pb-1 pt-1">
               {seat.handCount === 0 && (
                 <div className="text-xs text-white/40 italic px-4">empty hand</div>
               )}
