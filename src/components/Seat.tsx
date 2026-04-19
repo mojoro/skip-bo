@@ -5,6 +5,7 @@ import DraggableCard from '@/components/DraggableCard';
 import DroppableZone from '@/components/DroppableZone';
 import { Card as CardType, PlayerState } from '@/lib/game/types';
 import { SeatPosition } from '@/lib/layout/seating';
+import type { SeatViewModel } from '@/lib/view/seat';
 
 export type SeatSelection =
   | { kind: 'none' }
@@ -12,14 +13,9 @@ export type SeatSelection =
   | { kind: 'stock' }
   | { kind: 'discard'; pileIndex: number };
 
-interface SeatProps {
-  position?: SeatPosition; // undefined = flat layout (mobile/stacked)
-  player: PlayerState;
-  playerIndex: number;
-  isActive: boolean;
-  isYou: boolean; // full hand visible vs face-down
-  teamIndex: number | null;
-  teamColor: string | null;
+export interface SeatViewProps {
+  position?: SeatPosition;
+  seat: SeatViewModel;
   selection: SeatSelection;
   cardSize?: 'sm' | 'md';
   onSelectHand?: (idx: number) => void;
@@ -28,23 +24,13 @@ interface SeatProps {
   onClickDiscardTarget?: (pileIdx: number) => void;
 }
 
-export default function Seat({
-  position,
-  player,
-  playerIndex,
-  isActive,
-  isYou,
-  teamIndex,
-  teamColor,
-  selection,
-  cardSize = 'md',
-  onSelectHand,
-  onSelectStock,
-  onSelectDiscard,
-  onClickDiscardTarget,
-}: SeatProps) {
-  const stockTop: CardType | null =
-    player.stockPile.length > 0 ? player.stockPile[player.stockPile.length - 1] : null;
+export function SeatView(props: SeatViewProps) {
+  const {
+    position, seat, selection, cardSize = 'md',
+    onSelectHand, onSelectStock, onSelectDiscard, onClickDiscardTarget,
+  } = props;
+
+  const stockTop = seat.stockTop;
 
   const orientation = !position
     ? 'rotate-0'
@@ -56,7 +42,7 @@ export default function Seat({
           ? 'rotate-90'
           : 'rotate-0';
 
-  const activeRing = isActive
+  const activeRing = seat.isActive
     ? 'ring-2 ring-[var(--gold)] shadow-[0_0_24px_rgba(217,164,65,0.45)]'
     : 'ring-1 ring-black/30';
 
@@ -69,141 +55,140 @@ export default function Seat({
           boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.05)',
         }}
       >
-          {/* Team color strip */}
-          {teamColor && (
-            <div
-              className="absolute -top-1 left-3 right-3 h-1 rounded-full"
-              style={{ background: teamColor }}
-            />
-          )}
+        {seat.team && (
+          <div
+            className="absolute -top-1 left-3 right-3 h-1 rounded-full"
+            style={{ background: seat.team.color }}
+          />
+        )}
 
-          {/* Header */}
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-white tracking-wide">
-                {player.name}
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-white tracking-wide">
+              {seat.name}
+            </span>
+            {seat.team && (
+              <span
+                className="text-[10px] uppercase px-1.5 py-0.5 rounded font-bold tracking-wider"
+                style={{ background: seat.team.color, color: '#1a1a1a' }}
+              >
+                Team {seat.team.index + 1}
               </span>
-              {teamIndex !== null && (
-                <span
-                  className="text-[10px] uppercase px-1.5 py-0.5 rounded font-bold tracking-wider"
-                  style={{ background: teamColor ?? 'transparent', color: '#1a1a1a' }}
-                >
-                  Team {teamIndex + 1}
-                </span>
-              )}
-            </div>
-            {isActive && (
-              <span className="text-[10px] uppercase text-[var(--gold)] font-bold tracking-widest">
-                ↻ turn
+            )}
+            {seat.isHost && (
+              <span className="text-[10px] uppercase text-[var(--gold)] font-bold tracking-wider">
+                host
               </span>
             )}
           </div>
+          {seat.isActive && (
+            <span className="text-[10px] uppercase text-[var(--gold)] font-bold tracking-widest">
+              ↻ turn
+            </span>
+          )}
+        </div>
 
-          {/* Row: stock | hand | discard piles */}
-          <div className="flex items-end gap-2 sm:gap-4 flex-wrap sm:flex-nowrap">
-            {/* Stock pile */}
-            <div className="flex flex-col items-center gap-1">
-              {stockTop ? (
-                <DraggableCard
-                  id={`stock-${playerIndex}`}
-                  source={{ from: 'stock', playerIndex }}
-                  disabled={!isActive}
-                  card={stockTop}
-                  size={cardSize}
-                  highlighted={isActive && selection.kind === 'stock'}
-                  onClick={isActive ? onSelectStock : undefined}
-                  stacked={player.stockPile.length}
-                />
-              ) : (
-                <Card card={null} size={cardSize} label="empty" />
+        <div className="flex items-end gap-2 sm:gap-4 flex-wrap sm:flex-nowrap">
+          <div className="flex flex-col items-center gap-1">
+            {stockTop ? (
+              <DraggableCard
+                id={`stock-${seat.slotIndex}`}
+                source={{ from: 'stock', playerIndex: seat.slotIndex }}
+                disabled={!seat.isActive || !seat.isYou}
+                card={stockTop as CardType}
+                size={cardSize}
+                highlighted={seat.isActive && selection.kind === 'stock'}
+                onClick={seat.isActive && seat.isYou ? onSelectStock : undefined}
+                stacked={seat.stockCount}
+              />
+            ) : (
+              <Card card={null} size={cardSize} label="empty" />
+            )}
+            <span className="text-[10px] text-white/70 tracking-widest">
+              STOCK · {seat.stockCount}
+            </span>
+          </div>
+
+          <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
+            <div className="flex gap-1 overflow-x-auto max-w-full pb-1">
+              {seat.handCount === 0 && (
+                <div className="text-xs text-white/40 italic px-4">empty hand</div>
               )}
-              <span className="text-[10px] text-white/70 tracking-widest">
-                STOCK · {player.stockPile.length}
-              </span>
-            </div>
-
-            {/* Hand — fanned */}
-            <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
-              <div className="flex gap-1 overflow-x-auto max-w-full pb-1">
-                {player.hand.length === 0 && (
-                  <div className="text-xs text-white/40 italic px-4">empty hand</div>
-                )}
-                {player.hand.map((c, i) =>
-                  isYou ? (
+              {seat.handCards !== null
+                ? seat.handCards.map((c, i) => (
                     <DraggableCard
                       key={c.id}
-                      id={`hand-${playerIndex}-${i}`}
+                      id={`hand-${seat.slotIndex}-${i}`}
                       source={{ from: 'hand', index: i }}
-                      disabled={!isActive}
+                      disabled={!seat.isActive || !seat.isYou}
                       card={c}
                       size={cardSize}
                       highlighted={
-                        isActive && selection.kind === 'hand' && selection.index === i
+                        seat.isActive && selection.kind === 'hand' && selection.index === i
                       }
-                      onClick={isActive ? () => onSelectHand?.(i) : undefined}
+                      onClick={seat.isActive && seat.isYou ? () => onSelectHand?.(i) : undefined}
                     />
-                  ) : (
-                    <Card key={c.id} card={null} faceDown size={cardSize} />
-                  ),
-                )}
-              </div>
-              <span className="text-[10px] text-white/70 tracking-widest">
-                HAND · {player.hand.length}
-              </span>
+                  ))
+                : Array.from({ length: seat.handCount }).map((_, i) => (
+                    <Card key={`hand-back-${i}`} card={null} faceDown size={cardSize} />
+                  ))}
             </div>
+            <span className="text-[10px] text-white/70 tracking-widest">
+              HAND · {seat.handCount}
+            </span>
+          </div>
 
-            {/* Discard piles */}
-            <div className="flex flex-col items-center gap-1">
-              <div className="flex gap-1">
-                {player.discardPiles.map((pile, i) => {
-                  const top = pile[pile.length - 1] ?? null;
-                  const isSelected =
-                    isActive && selection.kind === 'discard' && selection.pileIndex === i;
-                  const handleClick = isActive
-                    ? () => {
-                        if (selection.kind === 'hand') {
-                          onClickDiscardTarget?.(i);
-                        } else {
-                          onSelectDiscard?.(i);
-                        }
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex gap-1">
+              {seat.discardPiles.map((pile, i) => {
+                const top = pile[pile.length - 1] ?? null;
+                const isSelected =
+                  seat.isActive && selection.kind === 'discard' && selection.pileIndex === i;
+                const handleClick = seat.isActive && seat.isYou
+                  ? () => {
+                      if (selection.kind === 'hand') {
+                        onClickDiscardTarget?.(i);
+                      } else {
+                        onSelectDiscard?.(i);
                       }
-                    : undefined;
-                  const card = top ? (
-                    <DraggableCard
-                      id={`discard-src-${playerIndex}-${i}`}
-                      source={{ from: 'discard', playerIndex, pileIndex: i }}
-                      disabled={!isActive || selection.kind === 'hand'}
-                      card={top}
-                      size="sm"
-                      highlighted={isSelected}
-                      stacked={pile.length}
-                      onClick={handleClick}
-                    />
-                  ) : (
-                    <Card card={null} size="sm" label="" onClick={handleClick} />
-                  );
-                  return (
-                    <div key={i} className="flex flex-col items-center gap-0.5">
-                      {isActive ? (
-                        <DroppableZone
-                          id={`discard-target-${playerIndex}-${i}`}
-                          data={{ kind: 'discard', index: i }}
-                        >
-                          {card}
-                        </DroppableZone>
-                      ) : (
-                        card
-                      )}
-                      <span className="text-[9px] text-white/50">{pile.length}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <span className="text-[10px] text-white/70 tracking-widest">DISCARD</span>
+                    }
+                  : undefined;
+                const card = top ? (
+                  <DraggableCard
+                    id={`discard-src-${seat.slotIndex}-${i}`}
+                    source={{ from: 'discard', playerIndex: seat.slotIndex, pileIndex: i }}
+                    disabled={!seat.isActive || !seat.isYou || selection.kind === 'hand'}
+                    card={top as CardType}
+                    size="sm"
+                    highlighted={isSelected}
+                    stacked={pile.length}
+                    onClick={handleClick}
+                  />
+                ) : (
+                  <Card card={null} size="sm" label="" onClick={handleClick} />
+                );
+                return (
+                  <div key={i} className="flex flex-col items-center gap-0.5">
+                    {seat.isActive && seat.isYou ? (
+                      <DroppableZone
+                        id={`discard-target-${seat.slotIndex}-${i}`}
+                        data={{ kind: 'discard', index: i }}
+                      >
+                        {card}
+                      </DroppableZone>
+                    ) : (
+                      card
+                    )}
+                    <span className="text-[9px] text-white/50">{pile.length}</span>
+                  </div>
+                );
+              })}
             </div>
+            <span className="text-[10px] text-white/70 tracking-widest">DISCARD</span>
           </div>
         </div>
       </div>
+    </div>
   );
 
   if (!position) return body;
@@ -218,5 +203,56 @@ export default function Seat({
     >
       {body}
     </div>
+  );
+}
+
+// Backward-compatible wrapper — `/local` still passes PlayerState-based props
+// until Task 5.2 migrates it to Board. Strip in Task 6.1 once the last caller is gone.
+export interface SeatProps {
+  position?: SeatPosition;
+  player: PlayerState;
+  playerIndex: number;
+  isActive: boolean;
+  isYou: boolean;
+  teamIndex: number | null;
+  teamColor: string | null;
+  selection: SeatSelection;
+  cardSize?: 'sm' | 'md';
+  onSelectHand?: (idx: number) => void;
+  onSelectStock?: () => void;
+  onSelectDiscard?: (pileIdx: number) => void;
+  onClickDiscardTarget?: (pileIdx: number) => void;
+}
+
+export default function Seat(props: SeatProps) {
+  const seat: SeatViewModel = {
+    slotIndex: props.playerIndex,
+    name: props.player.name,
+    handCards: props.isYou ? props.player.hand : null,
+    handCount: props.player.hand.length,
+    stockTop: props.player.stockPile.length > 0
+      ? { id: props.player.stockPile[props.player.stockPile.length - 1]!.id, value: props.player.stockPile[props.player.stockPile.length - 1]!.value }
+      : null,
+    stockCount: props.player.stockPile.length,
+    discardPiles: props.player.discardPiles.map((pile) => pile.map((c) => ({ id: c.id, value: c.value }))),
+    team: props.teamIndex !== null && props.teamColor !== null
+      ? { index: props.teamIndex, color: props.teamColor }
+      : null,
+    isActive: props.isActive,
+    isYou: props.isYou,
+    isHost: false,
+    presence: 'online',
+  };
+  return (
+    <SeatView
+      position={props.position}
+      seat={seat}
+      selection={props.selection}
+      cardSize={props.cardSize}
+      onSelectHand={props.onSelectHand}
+      onSelectStock={props.onSelectStock}
+      onSelectDiscard={props.onSelectDiscard}
+      onClickDiscardTarget={props.onClickDiscardTarget}
+    />
   );
 }
