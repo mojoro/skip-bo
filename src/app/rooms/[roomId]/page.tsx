@@ -8,13 +8,14 @@ import { PreGameRoom } from '@/components/room/PreGameRoom';
 import type { WinModalAction } from '@/components/WinModal';
 import { leaveRoom } from '@/lib/net/api';
 import { gameApiBaseUrl } from '@/lib/net/endpoints';
+import { randomUUID } from '@/lib/net/uuid';
 
 function useSessionId(): string | null {
   const [id, setId] = useState<string | null>(null);
   useEffect(() => {
     let existing = localStorage.getItem('skipboSessionId');
     if (!existing) {
-      existing = crypto.randomUUID();
+      existing = randomUUID();
       localStorage.setItem('skipboSessionId', existing);
     }
     setId(existing);
