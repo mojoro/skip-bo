@@ -5,7 +5,9 @@ export interface RoomInfo {
   code: string | null;
   displayName: string;
   phase: 'waiting' | 'playing' | 'finished';
-  config: import('@/lib/game/types').GameConfig;
+  // Server projects via `publicizeRoomConfig` so `seed` is stripped and
+  // `partnership.teams` carries slot indices instead of sessionIds.
+  config: PublicGameConfig;
   allowAiFill: boolean;
   visibility: 'public' | 'private';
   slotSummary: { humans: number; ai: number; open: number; locked: number; capacity: number };
