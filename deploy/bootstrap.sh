@@ -10,8 +10,10 @@ EMAIL=johnrmoorman@gmail.com
 REPO=https://github.com/mojoro/skip-bo.git
 
 # 1. System packages (all in AL2023 default repos).
+#    Plain `certbot` (no python3-certbot-nginx) — we use the webroot method
+#    in step 8 and never invoke the nginx plugin.
 dnf update -y
-dnf install -y docker nginx certbot python3-certbot-nginx git
+dnf install -y docker nginx certbot git
 
 # 2. Docker Compose plugin (NOT in AL2023 default repo — manual install).
 mkdir -p /usr/local/lib/docker/cli-plugins
