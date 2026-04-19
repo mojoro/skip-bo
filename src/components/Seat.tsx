@@ -3,7 +3,7 @@
 import Card from '@/components/Card';
 import DraggableCard from '@/components/DraggableCard';
 import DroppableZone from '@/components/DroppableZone';
-import { Card as CardType, PlayerState } from '@/lib/game/types';
+import { Card as CardType } from '@/lib/game/types';
 import { SeatPosition } from '@/lib/layout/seating';
 import type { SeatViewModel } from '@/lib/view/seat';
 
@@ -206,53 +206,3 @@ export function SeatView(props: SeatViewProps) {
   );
 }
 
-// Backward-compatible wrapper — `/local` still passes PlayerState-based props
-// until Task 5.2 migrates it to Board. Strip in Task 6.1 once the last caller is gone.
-export interface SeatProps {
-  position?: SeatPosition;
-  player: PlayerState;
-  playerIndex: number;
-  isActive: boolean;
-  isYou: boolean;
-  teamIndex: number | null;
-  teamColor: string | null;
-  selection: SeatSelection;
-  cardSize?: 'sm' | 'md';
-  onSelectHand?: (idx: number) => void;
-  onSelectStock?: () => void;
-  onSelectDiscard?: (pileIdx: number) => void;
-  onClickDiscardTarget?: (pileIdx: number) => void;
-}
-
-export default function Seat(props: SeatProps) {
-  const seat: SeatViewModel = {
-    slotIndex: props.playerIndex,
-    name: props.player.name,
-    handCards: props.isYou ? props.player.hand : null,
-    handCount: props.player.hand.length,
-    stockTop: props.player.stockPile.length > 0
-      ? { id: props.player.stockPile[props.player.stockPile.length - 1]!.id, value: props.player.stockPile[props.player.stockPile.length - 1]!.value }
-      : null,
-    stockCount: props.player.stockPile.length,
-    discardPiles: props.player.discardPiles.map((pile) => pile.map((c) => ({ id: c.id, value: c.value }))),
-    team: props.teamIndex !== null && props.teamColor !== null
-      ? { index: props.teamIndex, color: props.teamColor }
-      : null,
-    isActive: props.isActive,
-    isYou: props.isYou,
-    isHost: false,
-    presence: 'online',
-  };
-  return (
-    <SeatView
-      position={props.position}
-      seat={seat}
-      selection={props.selection}
-      cardSize={props.cardSize}
-      onSelectHand={props.onSelectHand}
-      onSelectStock={props.onSelectStock}
-      onSelectDiscard={props.onSelectDiscard}
-      onClickDiscardTarget={props.onClickDiscardTarget}
-    />
-  );
-}

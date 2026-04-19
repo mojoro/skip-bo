@@ -5,7 +5,7 @@ import DraggableCard from '@/components/DraggableCard';
 import DroppableZone from '@/components/DroppableZone';
 import MobileOpponentStrip from '@/components/MobileOpponentStrip';
 import WildDirectionPicker from '@/components/WildDirectionPicker';
-import { Card as CardType, GameState, PlayerState } from '@/lib/game/types';
+import { Card as CardType, GameState } from '@/lib/game/types';
 import { SeatSelection } from '@/components/Seat';
 import type { SeatViewModel } from '@/lib/view/seat';
 
@@ -220,98 +220,3 @@ export function MobileBoardView({
   );
 }
 
-// Backward-compat default export — /local still passes GameState-based props.
-// Strip in Task 6.1 once /local uses Board.
-interface MobileBoardProps {
-  state: GameState;
-  activePlayer: PlayerState;
-  activeIdx: number;
-  selection: SeatSelection;
-  teamColorFor: (id: string) => { index: number | null; color: string | null };
-  opponents: { player: PlayerState; index: number }[];
-  onSelectHand: (idx: number) => void;
-  onSelectStock: () => void;
-  onSelectDiscard: (pileIdx: number) => void;
-  onClickBuildPile: (buildPileIndex: number) => void;
-  onClickOwnDiscardPile: (pileIdx: number) => void;
-  pendingWildBuildPileIndex?: number | null;
-  onPickWildDirection?: (direction: 'asc' | 'desc') => void;
-  onCancelWildPlay?: () => void;
-}
-
-export default function MobileBoard(props: MobileBoardProps) {
-  const { state, activePlayer, activeIdx, teamColorFor, opponents } = props;
-
-  const activeTeam = teamColorFor(activePlayer.id);
-  const stockTop =
-    activePlayer.stockPile.length > 0
-      ? activePlayer.stockPile[activePlayer.stockPile.length - 1]!
-      : null;
-
-  const self: SeatViewModel = {
-    slotIndex: activeIdx,
-    name: activePlayer.name,
-    handCards: activePlayer.hand,
-    handCount: activePlayer.hand.length,
-    stockTop: stockTop ? { id: stockTop.id, value: stockTop.value } : null,
-    stockCount: activePlayer.stockPile.length,
-    discardPiles: activePlayer.discardPiles.map((pile) =>
-      pile.map((c) => ({ id: c.id, value: c.value })),
-    ),
-    team:
-      activeTeam.index !== null && activeTeam.color !== null
-        ? { index: activeTeam.index, color: activeTeam.color }
-        : null,
-    isActive: true,
-    isYou: true,
-    isHost: false,
-    presence: 'online',
-  };
-
-  const opponentSeats: SeatViewModel[] = opponents.map(({ player, index }) => {
-    const team = teamColorFor(player.id);
-    const top =
-      player.stockPile.length > 0
-        ? player.stockPile[player.stockPile.length - 1]!
-        : null;
-    return {
-      slotIndex: index,
-      name: player.name,
-      handCards: null,
-      handCount: player.hand.length,
-      stockTop: top ? { id: top.id, value: top.value } : null,
-      stockCount: player.stockPile.length,
-      discardPiles: player.discardPiles.map((pile) =>
-        pile.map((c) => ({ id: c.id, value: c.value })),
-      ),
-      team:
-        team.index !== null && team.color !== null
-          ? { index: team.index, color: team.color }
-          : null,
-      isActive: false,
-      isYou: false,
-      isHost: false,
-      presence: 'online',
-    };
-  });
-
-  return (
-    <MobileBoardView
-      self={self}
-      opponents={opponentSeats}
-      buildPiles={state.buildPiles}
-      drawPileCount={state.drawPile.length}
-      completedPileCount={state.completedBuildPiles.length}
-      config={state.config}
-      selection={props.selection}
-      onSelectHand={props.onSelectHand}
-      onSelectStock={props.onSelectStock}
-      onSelectDiscard={props.onSelectDiscard}
-      onClickBuildPile={props.onClickBuildPile}
-      onClickOwnDiscardPile={props.onClickOwnDiscardPile}
-      pendingWildBuildPileIndex={props.pendingWildBuildPileIndex ?? null}
-      onPickWildDirection={props.onPickWildDirection ?? (() => {})}
-      onCancelWildPlay={props.onCancelWildPlay ?? (() => {})}
-    />
-  );
-}
