@@ -19,6 +19,11 @@ ssh "$REMOTE" "cd $REMOTE_DIR && docker compose up -d --build"
 echo "→ Pruning dangling images..."
 ssh "$REMOTE" "docker image prune -f"
 
+echo "→ Syncing nginx config + reloading..."
+ssh "$REMOTE" "sudo cp $REMOTE_DIR/deploy/nginx.conf /etc/nginx/conf.d/skipbo.conf"
+ssh "$REMOTE" "sudo nginx -t"
+ssh "$REMOTE" "sudo systemctl reload nginx"
+
 echo "→ Waiting for containers to settle..."
 sleep 5
 
