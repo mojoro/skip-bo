@@ -52,14 +52,16 @@ export interface GameView {
 
 export type ClientMessage =
   | { type: 'action'; action: GameAction }
-  | { type: 'chat'; text: string };
+  | { type: 'chat'; text: string }
+  | { type: 'requestRematch' };
 
 export type ServerMessage =
   | { type: 'hello';       stateVersion: number; view: GameView }
   | { type: 'state';       stateVersion: number; view: GameView }
   | { type: 'actionError'; reason: string; stateVersion: number }
   | { type: 'chat';        fromSlotIndex: number; fromName: string; text: string; sentAt: number }
-  | { type: 'gameEnded';   stateVersion: number; view: GameView; reason: 'winner' | 'abandoned' };
+  | { type: 'gameEnded';   stateVersion: number; view: GameView; reason: 'winner' | 'abandoned' }
+  | { type: 'rematchReady'; newRoomId: string };
 
 export interface ChatEntry {
   fromSlotIndex: number;

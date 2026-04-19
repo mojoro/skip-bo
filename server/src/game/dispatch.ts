@@ -47,6 +47,8 @@ export function dispatchMessage(
     ];
   }
 
+  if (msg.type !== 'action') return [];
+
   // action
   const stateVersion = room.game?.stateVersion ?? 0;
   if (room.phase !== 'playing' || !room.game) {

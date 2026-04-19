@@ -35,6 +35,7 @@ const GameActionSchema: z.ZodType<GameAction> = z.union([
 export const ClientMessageSchema = z.union([
   z.object({ type: z.literal('action'), action: GameActionSchema }).strict(),
   z.object({ type: z.literal('chat'), text: z.string().min(1).max(MAX_CHAT_LEN) }).strict(),
+  z.object({ type: z.literal('requestRematch') }).strict(),
 ]);
 
 export type ClientMessage = z.infer<typeof ClientMessageSchema>;
@@ -44,4 +45,5 @@ export type ServerMessage =
   | { type: 'state';       stateVersion: number; view: GameView }
   | { type: 'actionError'; reason: string; stateVersion: number }
   | { type: 'chat';        fromSlotIndex: number; fromName: string; text: string; sentAt: number }
-  | { type: 'gameEnded';   stateVersion: number; view: GameView; reason: 'winner' | 'abandoned' };
+  | { type: 'gameEnded';   stateVersion: number; view: GameView; reason: 'winner' | 'abandoned' }
+  | { type: 'rematchReady'; newRoomId: string };
