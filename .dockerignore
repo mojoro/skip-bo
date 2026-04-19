@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+server/node_modules
+server/dist
+docs
+*.md
+.env*
+.claude
+.worktrees
+coverage
+*.png
+.playwright-mcp
