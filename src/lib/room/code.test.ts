@@ -15,7 +15,6 @@ describe('normalizeRoomCode', () => {
   });
 
   it('returns empty string for non-string input', () => {
-    // @ts-expect-error — intentional runtime check
     expect(normalizeRoomCode(null)).toBe('');
   });
 });
