@@ -32,6 +32,7 @@ describe('PlayerView null view', () => {
       config: minimalConfig,
       allowAiFill: false,
       youSlotIndex: 0,
+      code: '',
     };
     expect(view.view).toBeNull();
   });
@@ -44,6 +45,7 @@ describe('PlayerView null view', () => {
       config: minimalConfig,
       allowAiFill: false,
       youSlotIndex: 0,
+      code: '',
     };
     expect(view.hostSlotIndex).toBe(0);
     expect(view.view).toBe(null);
