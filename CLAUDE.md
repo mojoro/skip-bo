@@ -6,13 +6,11 @@ Repo: https://github.com/mojoro/skip-bo
 
 ## 🔖 Where we left off
 
-Section 6 (shared Board component + rematch) shipped. Audit of the codex-written branch surfaced a broken rematch flow (finishGame was closing sockets with terminal 4005 before the WinModal could send `requestRematch`); that's been fixed in this branch — `finishGame` now only flips phase + schedules cleanup, sockets stay alive until the post-game `deleteRoom` timer at `FINISH_CLEANUP_MS` fires roomClosed. The shared Board in `src/components/Board.tsx` takes `(view, seats, dispatch, youSlotIndex, winActions[])`; callers compose win-modal buttons. `/local` ships **Play again / New Game / Play online**; `/rooms/[roomId]` ships **Back to lobby / Keep same group** (swaps to **Enter rematch →** once the server broadcasts `rematchReady`).
+Section 6.5 (lobby + AoE2-style pre-game room) shipped on `feature/section-6.5-lobby`. Landing page is now the lobby (SSE-backed public rooms list, create/join forms, display-name gate). `/rooms/[roomId]` phase-branches between `<PreGameRoom>` (waiting) and `<Board>` (playing). Game WS handshake now accepts waiting-phase connections so one socket covers both views — `broadcastRoomState` fans out a state frame to every connected waiting-phase socket whenever a REST mutation fires (join/leave/slot-change/config-patch/start).
 
-**Next up — lobby UI.** The server's REST + SSE lobby is fully wired; the browser has no UI yet beyond the minimal landing page at `/app/page.tsx`. Build a list of public waiting rooms (via SSE), create-room form, and join-by-code flow. The "Play online" button in the /local WinModal already points at `/`, expecting that page to grow into the lobby.
+**Next up — Section 5 (AI bots).** Random-legal stub at `server/src/game/bot.ts`. Replace with rule-based / heuristic strategy. Same `applyAction` contract. Section 7 (AWS deploy) after that.
 
-Sections 5 (AI bots — real strategy over the random-legal stub) and 7 (AWS deploy) come after.
-
-**Running it locally:** server builds + runs via `cd server && npm run build && npm start` (tsx watch is broken per follow-up #14). Next dev needs `.env.local` at repo root with `NEXT_PUBLIC_GAME_WS_URL=ws://localhost:8787` or the client hook tries `ws://localhost:3000` and fails.
+**Running it locally:** `npm --prefix server run build` then `npm --prefix server start` (tsx watch broken per #14). Next dev needs `.env.local` at repo root with both `NEXT_PUBLIC_GAME_WS_URL=ws://localhost:8787` and `NEXT_PUBLIC_GAME_API_URL=http://localhost:8787`.
 
 **Follow-ups:**
 - #4. `patchRoomSchema` allows partial `config` merges that silently resize below seated count — drop `config` from PATCH or add config-aware handler.
@@ -23,12 +21,15 @@ Sections 5 (AI bots — real strategy over the random-legal stub) and 7 (AWS dep
 - #10. Root `.dockerignore` missing — `docker compose build` at context `..` ships `node_modules`/`.next`/`.git` to Docker daemon. Add before first real image build.
 - #11. SSE full-flow test reads raw chunks with `.includes(...)` rather than accumulating `\n\n`-delimited buffer; `reader.cancel()` + `httpServer.close()` not awaited at teardown.
 - #13. Root `tsconfig.json` picks up `server/` TS files but lacks `@engine/*` alias (lives in `server/tsconfig.json`). Either exclude `server/` from root tsconfig or teach it alias.
-- #14. `cd server && npm run dev` (tsx watch) fails with `module '@engine/engine' does not provide export 'createGame'` — cross-package ESM/CJS boundary (root package.json has no `"type": "module"`). Workaround: `npm run build && npm start` from `server/`. Likely fix: `package.json` with `{"type":"module"}` at `src/lib/game/`.
+- #14. `npm run dev` (tsx watch) fails — cross-package ESM/CJS boundary. Workaround: `npm --prefix server run build` then `npm --prefix server start`.
 - #15. Audit-4 deferred: sessionIds still land in server attach/detach/rate-limit/action-error logs, no React-level test driving `useGameSocket` through mount/unmount/visibility, chat sanitizer only strips ASCII C0/DEL.
+- #16. `normalizeRoomCode` only uppercases — does not strip whitespace. JoinByCodeForm should trim/collapse before calling it so `"AB CD"` works for a user who typed with a space.
+- #17. `manager.ts` `onWaitingStateChange` comment says "fires after removeMember" but the empty-room deletion path returns before calling `emitStateChange` — comment is stale (no runtime bug, just misleading).
+- #18. `broadcastRoomState` computes `seats` before the per-connection loop; if `buildSeats` throws the entire fan-out silently aborts. Low risk today but violates the stated resilience guarantee.
 
 **Audit 3+4 closed these prior follow-ups:** #1 (setSlot displacement) via audit-3 #H, #2/#3 (finishGame cleanup) in Section 3 Task 2, #5 (`connected: false` semantics) resolved — means "not WS-attached".
 
-**State:** server suite 135/135, main-app suite 96/96, server typecheck clean. Root `npx tsc --noEmit` still fails only on follow-up #13 (`@engine/*` alias).
+**State:** server suite 139/139, main-app suite 138/138, server typecheck clean. Root `npx tsc --noEmit` still fails only on follow-up #13 (`@engine/*` alias).
 
 ## Status snapshot
 
@@ -39,6 +40,7 @@ Sections 5 (AI bots — real strategy over the random-legal stub) and 7 (AWS dep
 - **Networking — Room Manager + Lobby (done):** `server/` package with REST (rooms/members/slots/game), SSE lobby stream with snapshot+deltas+heartbeat, in-memory `RoomManager` (idle + post-game cleanup, host migration), Zod schemas, Problem+JSON errors, token-bucket rate limits, graceful shutdown, esbuild+pm2+Dockerfile. 69 Vitest tests including full-flow integration test. OpenAPI 3.1 spec at `server/openapi.yaml`.
 - **Networking — game WebSocket + client hook (done):** `server/src/game/` adds raw-`ws` upgrade handler, per-socket `GameConnection`, `GameRegistry`, pure dispatch, per-slot 60 s grace, bot takeover (random legal move stub), full-flow integration tests. Client `useGameSocket` hook handles exponential backoff, terminal-code-aware reconnect, visibility-driven resume, bounded send queue. Hot-seat demo moved to `/local`; `/rooms/[roomId]` renders networked state.
 - **Shared Board + rematch (done):** `src/components/Board.tsx` is the single tabletop renderer consumed by both `/local` (local engine dispatch via `src/lib/view/fromEngine.ts`) and `/rooms/[roomId]` (socket dispatch). `SeatViewModel` in `src/lib/view/seat.ts` unifies self/opponent/empty seat shape. WinModal is actions-based — callers pass `WinModalAction[]`. Rematch flow: client sends `requestRematch` over the still-alive post-finish socket, server creates a new room via `RoomManager.createRematchRoom` (fresh seed, seated humans preserved at their slot indices, bot-controlled until they attach, first human to attach claims host via `migrateHostAwayFromBot`), broadcasts `rematchReady`. Old room lives ~5 min then `deleteRoom` closes any lingering sockets with 4005.
+- **Lobby + pre-game room (done):** Landing page at `/` is now a lobby: SSE-subscribed public rooms list (`useLobbyStream` → `/v1/lobby/stream`), create-room form (opens `NewGameModal`, POSTs to `/v1/rooms`), join-by-code form, display-name gate backed by localStorage. `/rooms/[roomId]` phase-branches on `socket.view.view === null`: waiting → `<PreGameRoom>` (slot list with host dropdown, config summary with host edit, chat panel, start-game button); playing → `<Board>`. Handshake accepts both `waiting` and `playing` phase; `broadcastRoomState` fans out `state` frames over all connected sockets on every REST mutation and game start.
 
 ## Stack
 
