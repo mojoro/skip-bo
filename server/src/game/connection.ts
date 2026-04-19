@@ -98,6 +98,11 @@ export class GameConnection implements RegisteredConnection {
     this.registry.add(this.room.id, this);
     this.log.info({ roomId: this.room.id, sessionId: this.sessionId, slotIndex: this.slotIndex }, 'attach');
 
+    // First human to attach into a pre-seated rematch room claims host via
+    // the existing migrateHostAwayFromBot path.
+    const newHost = this.manager.migrateHostAwayFromBot(this.room);
+    if (newHost) this.log.info({ newHost, from: this.sessionId }, 'hostClaimedOnAttach');
+
     this.sendHello();
     // Notify peers that this seat's `connected` flag flipped; the joining
     // connection already has the full state via `hello`, so exclude it to
@@ -176,8 +181,30 @@ export class GameConnection implements RegisteredConnection {
         this.broadcastChat(e.chat);
       } else if (e.kind === 'afterCommit') {
         this.onAfterCommit();
+      } else if (e.kind === 'createRematch') {
+        this.handleRematchRequest(e.requesterSessionId);
       }
     }
+  }
+
+  private handleRematchRequest(requesterSessionId: string): void {
+    const existing = this.registry.getRematchRoomId(this.room.id);
+    if (existing) {
+      // Idempotent: re-send to the requester only.
+      const conn = this.registry.findBySession(this.room.id, requesterSessionId);
+      conn?.send({ type: 'rematchReady', newRoomId: existing } satisfies ServerMessage);
+      return;
+    }
+    const seatedHumans = this.room.slots
+      .map((slot, i) => ({ slot, i }))
+      .filter((x) => x.slot.kind === 'human')
+      .map((x) => {
+        const s = x.slot as Extract<typeof x.slot, { kind: 'human' }>;
+        return { sessionId: s.sessionId, name: s.name, slotIndex: x.i };
+      });
+    const { room: rematch } = this.manager.createRematchRoom({ sourceRoom: this.room, seatedHumans });
+    this.registry.setRematchRoomId(this.room.id, rematch.id);
+    this.registry.broadcast(this.room.id, { type: 'rematchReady', newRoomId: rematch.id } satisfies ServerMessage);
   }
 
   private onAfterCommit(): void {

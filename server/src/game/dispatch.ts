@@ -10,7 +10,8 @@ export type DispatchEffect =
       kind: 'broadcastChat';
       chat: Extract<ServerMessage, { type: 'chat' }>;
     }
-  | { kind: 'afterCommit' };
+  | { kind: 'afterCommit' }
+  | { kind: 'createRematch'; requesterSessionId: string };
 
 export interface DispatchDeps {
   now: () => number;
@@ -45,6 +46,20 @@ export function dispatchMessage(
         },
       },
     ];
+  }
+
+  if (msg.type === 'requestRematch') {
+    const stateVersion = room.game?.stateVersion ?? 0;
+    if (room.phase !== 'finished' || !room.game) {
+      return [
+        {
+          kind: 'sendTo',
+          sessionId,
+          message: { type: 'actionError', reason: 'notFinished', stateVersion },
+        },
+      ];
+    }
+    return [{ kind: 'createRematch', requesterSessionId: sessionId }];
   }
 
   if (msg.type !== 'action') return [];

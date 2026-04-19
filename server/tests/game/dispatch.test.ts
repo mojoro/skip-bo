@@ -134,3 +134,38 @@ describe('dispatchMessage', () => {
     });
   });
 });
+
+describe('dispatchMessage for requestRematch', () => {
+  it('emits actionError when room is not finished', () => {
+    const room = makeRoom();
+    // Leave game null and phase 'waiting' — the typical dispatch precondition.
+    const effects = dispatchMessage(room, 'sess-host', { type: 'requestRematch' }, { now: () => Date.now() });
+    expect(effects).toHaveLength(1);
+    expect(effects[0]).toMatchObject({ kind: 'sendTo', sessionId: 'sess-host' });
+    const msg = (effects[0] as { kind: 'sendTo'; message: any }).message;
+    expect(msg.type).toBe('actionError');
+    expect(msg.reason).toBe('notFinished');
+  });
+
+  it('emits a createRematch effect when game is finished', () => {
+    const room = makeRoom({ hostSessionId: 'sess-host' });
+    room.phase = 'finished';
+    room.game = {
+      config: room.config,
+      phase: 'finished',
+      turnPhase: 'play',
+      drawPile: [],
+      completedBuildPiles: [],
+      buildPiles: [],
+      players: [
+        { id: 'sess-host', name: 'Host', stockPile: [], hand: [], discardPiles: [[], [], [], []] },
+      ],
+      currentPlayerIndex: 0,
+      winningTeamIndex: 0,
+      stateVersion: 10,
+    };
+    const effects = dispatchMessage(room, 'sess-host', { type: 'requestRematch' }, { now: () => Date.now() });
+    expect(effects).toHaveLength(1);
+    expect(effects[0]).toEqual({ kind: 'createRematch', requesterSessionId: 'sess-host' });
+  });
+});
