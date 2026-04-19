@@ -1,11 +1,11 @@
 'use client';
 
-import { GameConfig } from '@/lib/game/types';
+import type { PublicGameConfig } from '@/lib/net/protocol';
 
 interface RulesetInfoProps {
   open: boolean;
   onClose: () => void;
-  config: GameConfig;
+  config: PublicGameConfig;
   playerNames: string[];
 }
 
@@ -15,9 +15,7 @@ export default function RulesetInfo({ open, onClose, config, playerNames }: Rule
   const partnership = config.partnership;
   const teamLabels =
     partnership?.teams.map((team) =>
-      team
-        .map((pid) => playerNames[parseInt(pid.replace(/\D/g, ''), 10) - 1] ?? pid)
-        .join(' + '),
+      team.map((slotIndex) => playerNames[slotIndex] ?? `seat ${slotIndex + 1}`).join(' + '),
     ) ?? [];
 
   return (
@@ -98,9 +96,6 @@ export default function RulesetInfo({ open, onClose, config, playerNames }: Rule
           </div>
         )}
 
-        {typeof config.seed === 'number' && (
-          <div className="text-xs text-zinc-500">Seed: {config.seed}</div>
-        )}
       </div>
     </div>
   );
