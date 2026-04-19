@@ -34,8 +34,24 @@ export function PreGameRoom(props: PreGameRoomProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopyCode = async () => {
+    // `navigator.clipboard.writeText` requires a secure context (HTTPS or
+    // localhost). On a LAN IP over HTTP it's undefined or throws
+    // NotAllowedError. Fall back to the legacy execCommand path so phones
+    // on the LAN still get a functional Copy button.
     try {
-      await navigator.clipboard.writeText(props.code);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(props.code);
+      } else {
+        const el = document.createElement('textarea');
+        el.value = props.code;
+        el.setAttribute('readonly', '');
+        el.style.position = 'absolute';
+        el.style.left = '-9999px';
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch { /* clipboard denied — leave the code visible for manual copy */ }
