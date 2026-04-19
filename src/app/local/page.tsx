@@ -7,6 +7,7 @@ import NewGameModal, {
   buildPartnershipFromSettings,
   settingsToConfigOverrides,
 } from '@/components/NewGameModal';
+import type { WinModalAction } from '@/components/WinModal';
 import { applyAction, createGame } from '@/lib/game/engine';
 import { GameAction, GameState } from '@/lib/game/types';
 import { engineStateToView } from '@/lib/view/fromEngine';
@@ -43,6 +44,9 @@ export default function LocalHome() {
   // populates the game after mount.
   const [state, setState] = useState<GameState | null>(null);
   const [newGameOpen, setNewGameOpen] = useState(false);
+  // Remembers the last settings the user chose in NewGameModal so "Play again"
+  // can restart with identical config. Null = the initial default game.
+  const [lastSettings, setLastSettings] = useState<NewGameSettings | null>(null);
 
   useEffect(() => {
     setState((prev) => prev ?? defaultInitialGame());
@@ -65,9 +69,23 @@ export default function LocalHome() {
   );
 
   const startGame = (settings: NewGameSettings) => {
+    setLastSettings(settings);
     setState(makeGameFromSettings(settings));
     setNewGameOpen(false);
   };
+
+  const playAgain = useCallback(() => {
+    setState(lastSettings ? makeGameFromSettings(lastSettings) : defaultInitialGame());
+  }, [lastSettings]);
+
+  const winActions: WinModalAction[] = useMemo(
+    () => [
+      { key: 'again', label: 'Play again', variant: 'primary', onClick: playAgain },
+      { key: 'new', label: 'New Game', onClick: () => setNewGameOpen(true) },
+      { key: 'online', label: 'Play online', href: '/' },
+    ],
+    [playAgain],
+  );
 
   if (!state || !view || !seats) {
     return (
@@ -94,6 +112,7 @@ export default function LocalHome() {
         seats={seats}
         dispatch={dispatch}
         youSlotIndex={state.currentPlayerIndex}
+        winActions={winActions}
       />
 
       <NewGameModal
