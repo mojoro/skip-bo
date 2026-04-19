@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Board from '@/components/Board';
 import NewGameModal, {
   NewGameSettings,
@@ -28,29 +29,15 @@ function makeGameFromSettings(settings: NewGameSettings): GameState {
   });
 }
 
-function defaultInitialGame(): GameState {
-  return createGame({
-    players: [
-      { id: 'p1', name: 'Player 1' },
-      { id: 'p2', name: 'Player 2' },
-    ],
-    ruleset: 'recommended',
-  });
-}
-
 export default function LocalHome() {
-  // Defer createGame() to the client so its Math.random() seed matches between
-  // hydration passes. Server + first client render show a blank felt; an effect
-  // populates the game after mount.
+  const router = useRouter();
+  // First visit: no game yet — the New Game modal opens immediately so the
+  // user picks their settings before being dropped onto a table.
   const [state, setState] = useState<GameState | null>(null);
-  const [newGameOpen, setNewGameOpen] = useState(false);
-  // Remembers the last settings the user chose in NewGameModal so "Play again"
-  // can restart with identical config. Null = the initial default game.
+  const [newGameOpen, setNewGameOpen] = useState(true);
+  // Remembers the last settings the user chose so "Play again" can restart
+  // with identical config.
   const [lastSettings, setLastSettings] = useState<NewGameSettings | null>(null);
-
-  useEffect(() => {
-    setState((prev) => prev ?? defaultInitialGame());
-  }, []);
 
   const { view, seats } = useMemo(() => {
     if (!state) return { view: null, seats: null };
@@ -74,8 +61,17 @@ export default function LocalHome() {
     setNewGameOpen(false);
   };
 
+  // Cancel is an escape hatch. Before the first game exists it means "I
+  // changed my mind" — send them back to the lobby. Mid-game it just closes
+  // the modal and keeps the current table intact.
+  const handleCancel = () => {
+    if (state) setNewGameOpen(false);
+    else router.push('/');
+  };
+
   const playAgain = useCallback(() => {
-    setState(lastSettings ? makeGameFromSettings(lastSettings) : defaultInitialGame());
+    if (!lastSettings) return;
+    setState(makeGameFromSettings(lastSettings));
   }, [lastSettings]);
 
   const winActions: WinModalAction[] = useMemo(
@@ -89,9 +85,17 @@ export default function LocalHome() {
 
   if (!state || !view || !seats) {
     return (
-      <div className="wood-frame min-h-screen p-2 sm:p-3">
-        <div className="felt-surface relative rounded-xl overflow-hidden h-[calc(100vh-24px)] sm:h-[calc(100vh-32px)]" />
-      </div>
+      <>
+        <div className="wood-frame min-h-screen p-2 sm:p-3">
+          <div className="felt-surface relative rounded-xl overflow-hidden h-[calc(100vh-24px)] sm:h-[calc(100vh-32px)]" />
+        </div>
+        <NewGameModal
+          open={newGameOpen}
+          onCancel={handleCancel}
+          onStart={startGame}
+          defaultPlayerCount={2}
+        />
+      </>
     );
   }
 
@@ -115,7 +119,7 @@ export default function LocalHome() {
 
       <NewGameModal
         open={newGameOpen}
-        onCancel={() => setNewGameOpen(false)}
+        onCancel={handleCancel}
         onStart={startGame}
         defaultPlayerCount={state.players.length}
       />
