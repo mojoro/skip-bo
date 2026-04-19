@@ -82,6 +82,14 @@ function publicizePartnership(
   players.forEach((p, i) => idToSlot.set(p.id, i));
   return {
     ...partnership,
-    teams: partnership.teams.map((team) => team.map((id) => idToSlot.get(id) ?? -1)),
+    teams: partnership.teams.map((team) =>
+      team.map((id) => {
+        const slot = idToSlot.get(id);
+        if (slot === undefined) {
+          throw new Error(`publicizePartnership: player id "${id}" not found in players array`);
+        }
+        return slot;
+      })
+    ),
   };
 }
