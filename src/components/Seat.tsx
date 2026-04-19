@@ -37,9 +37,9 @@ export function SeatView(props: SeatViewProps) {
     : position.side === 'top'
       ? 'rotate-180'
       : position.side === 'left'
-        ? '-rotate-90'
+        ? 'rotate-90'
         : position.side === 'right'
-          ? 'rotate-90'
+          ? '-rotate-90'
           : 'rotate-0';
 
   const activeRing = seat.isActive
