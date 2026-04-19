@@ -104,6 +104,48 @@ describe('GET /v1/rooms', () => {
   });
 });
 
+describe('GET /v1/rooms config sanitization (C1 audit)', () => {
+  let ctx: Awaited<ReturnType<typeof start>>;
+  beforeEach(async () => { ctx = await start(); });
+  afterEach(() => { ctx.server.close(); });
+
+  it('strips seed from listed rooms', async () => {
+    const { room } = ctx.mgr.create({
+      sessionId: 'h', playerName: 'H',
+      config: baseConfigBody(), allowAiFill: true, visibility: 'public',
+    });
+    room.config.seed = 0xdeadbeef; // simulate rematch-seeded room
+    const res = await fetch(`${ctx.url}/v1/rooms`);
+    const body = (await res.json()) as { rooms: Array<{ config: Record<string, unknown> }> };
+    expect(body.rooms).toHaveLength(1);
+    expect(body.rooms[0]!.config).not.toHaveProperty('seed');
+  });
+
+  it('remaps partnership.teams to slot indices', async () => {
+    const { room } = ctx.mgr.create({
+      sessionId: 'h', playerName: 'Host',
+      config: baseConfigBody(), allowAiFill: true, visibility: 'public',
+    });
+    ctx.mgr.addMember(room.id, { sessionId: 'g1', playerName: 'G1' });
+    ctx.mgr.addMember(room.id, { sessionId: 'g2', playerName: 'G2' });
+    ctx.mgr.addMember(room.id, { sessionId: 'g3', playerName: 'G3' });
+    room.config.partnership = {
+      enabled: true,
+      teams: [['h', 'g2'], ['g1', 'g3']], // sessionIds server-side
+      allowPlayFromPartnerStock: true,
+      allowPlayFromPartnerDiscard: true,
+      allowDiscardToPartnerDiscard: false,
+    };
+    const res = await fetch(`${ctx.url}/v1/rooms/${room.id}`);
+    const body = (await res.json()) as { config: { partnership: { teams: number[][] } | null } };
+    expect(body.config.partnership).not.toBeNull();
+    expect(body.config.partnership!.teams).toEqual([[0, 2], [1, 3]]); // slot indices
+    // and no sessionIds leak via JSON.stringify of the whole body
+    expect(JSON.stringify(body)).not.toContain('"h"');
+    expect(JSON.stringify(body)).not.toContain('g1');
+  });
+});
+
 describe('PATCH /v1/rooms/:id', () => {
   let ctx: Awaited<ReturnType<typeof start>>;
   beforeEach(async () => { ctx = await start(); });

@@ -1,4 +1,12 @@
-import type { GameConfig, GameState } from '@engine/types';
+import type { GameConfig, GameState, PartnershipRules } from '@engine/types';
+
+// Wire-safe shape of GameConfig for REST + SSE. Drops the RNG seed (would
+// leak the full future shuffle) and remaps partnership.teams from engine
+// player ids (sessionIds for humans) to slot indices. Produced by
+// `src/room/slots.ts:publicizeRoomConfig`.
+export type PublicRoomConfig = Omit<GameConfig, 'seed' | 'partnership'> & {
+  partnership: (Omit<PartnershipRules, 'teams'> & { teams: number[][] }) | null;
+};
 
 export type RoomPhase = 'waiting' | 'playing' | 'finished';
 export type Visibility = 'public' | 'private';
@@ -43,7 +51,7 @@ export interface RoomInfo {
   code: string | null;
   displayName: string;
   phase: RoomPhase;
-  config: GameConfig;
+  config: PublicRoomConfig;
   allowAiFill: boolean;
   visibility: Visibility;
   slotSummary: {

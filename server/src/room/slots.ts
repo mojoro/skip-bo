@@ -1,4 +1,22 @@
-import type { Room, RoomInfo, Slot } from '../types';
+import type { PublicRoomConfig, Room, RoomInfo, Slot } from '../types';
+import { slotIndexForPlayerId } from '../game/mapping';
+
+// Wire-safe projection of GameConfig. Mirrors `publicizeConfig` in
+// `src/game/view.ts` but reachable from REST + SSE paths. Strips `seed`
+// (would let any viewer reconstruct future shuffles — critical for rematch
+// rooms where `seed` is pre-set) and remaps `partnership.teams` from engine
+// player ids (sessionIds for humans) to slot indices (seat takeover risk).
+export function publicizeRoomConfig(room: Room): PublicRoomConfig {
+  const { seed: _seed, partnership, ...rest } = room.config;
+  if (!partnership) return { ...rest, partnership: null };
+  return {
+    ...rest,
+    partnership: {
+      ...partnership,
+      teams: partnership.teams.map((team) => team.map((id) => slotIndexForPlayerId(room, id))),
+    },
+  };
+}
 
 export function summarizeSlots(slots: Slot[]): RoomInfo['slotSummary'] {
   const summary = { humans: 0, ai: 0, open: 0, locked: 0, capacity: slots.length };
@@ -36,7 +54,7 @@ export function projectRoomInfo(
     code: codeVisible ? room.code : null,
     displayName: room.displayName,
     phase: room.phase,
-    config: room.config,
+    config: publicizeRoomConfig(room),
     allowAiFill: room.allowAiFill,
     visibility: room.visibility,
     slotSummary: summarizeSlots(room.slots),
