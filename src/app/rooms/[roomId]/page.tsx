@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, use, type ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameSocket } from '@/lib/net/useGameSocket';
+import ActionErrorToast from '@/components/ActionErrorToast';
 import Board from '@/components/Board';
 import { PreGameRoom } from '@/components/room/PreGameRoom';
 import type { WinModalAction } from '@/components/WinModal';
@@ -29,14 +30,6 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
   const socket = useGameSocket(roomId, sessionId ?? '');
   const router = useRouter();
 
-  // Auto-dismiss lastActionError after 2 s
-  const [actionError, setActionError] = useState<string | null>(null);
-  useEffect(() => {
-    if (!socket.lastActionError) return;
-    setActionError(socket.lastActionError.reason);
-    const id = setTimeout(() => setActionError(null), 2000);
-    return () => clearTimeout(id);
-  }, [socket.lastActionError]);
 
   // Pending state for the rematch button so clicking it flips to "Creating…"
   // immediately instead of waiting for the rematchReady round trip. Cleared
@@ -147,12 +140,7 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
 
   return (
     <>
-      {/* Action error toast — overlays the board */}
-      {actionError && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm text-rose-200 bg-rose-900/90 ring-1 ring-rose-700/60 shadow-lg pointer-events-none">
-          <strong className="font-semibold">Action rejected:</strong> {actionError}
-        </div>
-      )}
+      <ActionErrorToast error={socket.lastActionError} />
 
       <Board
         view={view}
