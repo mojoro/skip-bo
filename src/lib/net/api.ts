@@ -102,7 +102,11 @@ export async function setSlot(input: SetSlotInput): Promise<void> {
 
 export interface PatchRoomInput extends WithAuth {
   roomId: string;
-  patch: Partial<{ displayName: string; config: GameConfig; allowAiFill: boolean; visibility: 'public' | 'private' }>;
+  // Server accepts a partial GameConfig (see `patchRoomSchema` —
+  // `gameConfigSchema.partial().optional()`). Typing `config` as
+  // Partial<GameConfig> here lets callers omit fields they don't want to
+  // touch, e.g. partnership teams (server rebuilds those at startGame).
+  patch: Partial<{ displayName: string; config: Partial<GameConfig>; allowAiFill: boolean; visibility: 'public' | 'private' }>;
 }
 
 export async function patchRoom(input: PatchRoomInput): Promise<void> {

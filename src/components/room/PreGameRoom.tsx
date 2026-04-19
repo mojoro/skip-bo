@@ -10,7 +10,6 @@ import { ChatPanel } from './ChatPanel';
 import { StartButton } from './StartButton';
 import { leaveRoom, patchRoom, setSlot, startGame, ApiError } from '@/lib/net/api';
 import type { GameViewSeat, ChatEntry, PublicGameConfig } from '@/lib/net/protocol';
-import type { GameConfig } from '@/lib/game/types';
 
 export interface PreGameRoomProps {
   baseUrl: string;
@@ -65,20 +64,21 @@ export function PreGameRoom(props: PreGameRoomProps) {
   const handleEditSave = async (settings: NewGameSettings) => {
     setError(null);
     try {
-      const partnership = settings.partnershipEnabled
-        ? { enabled: true, allowPlayFromPartnerStock: true, allowPlayFromPartnerDiscard: true, allowDiscardToPartnerDiscard: settings.partnershipAllowDiscardToPartner, teams: props.config.partnership?.teams ?? [] }
-        : null;
+      // `partnership` is intentionally omitted. Teams on the wire use
+      // slot indices (number[][]), but the server stores engine player
+      // ids (string[][]) and rebuilds teams at startGame from the final
+      // slot order anyway. Sending the publicized shape would corrupt
+      // the stored string[][] or fail Zod — neither helps. Partnership
+      // toggles mid-waiting are a separate follow-up.
       await patchRoom({
         baseUrl: props.baseUrl, sessionId: props.sessionId, roomId: props.roomId,
         patch: {
           config: {
-            ...props.config,
             ruleset: settings.ruleset,
             stockPileSize: settings.stockPileSize,
             handSize: settings.handSize,
             bidirectionalBuild: settings.bidirectionalBuild,
-            partnership,
-          } as GameConfig,
+          },
         },
       });
       setEditing(false);
