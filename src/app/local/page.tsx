@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import ActionErrorToast from '@/components/ActionErrorToast';
 import Board from '@/components/Board';
 import NewGameModal, {
   NewGameSettings,
@@ -38,6 +39,9 @@ export default function LocalHome() {
   // Remembers the last settings the user chose so "Play again" can restart
   // with identical config.
   const [lastSettings, setLastSettings] = useState<NewGameSettings | null>(null);
+  // Surfaces illegal-action feedback through the same toast the online game
+  // uses. Reset to a new object each rejection so ActionErrorToast retriggers.
+  const [actionError, setActionError] = useState<{ reason: string } | null>(null);
 
   const { view, seats } = useMemo(() => {
     if (!state) return { view: null, seats: null };
@@ -49,7 +53,11 @@ export default function LocalHome() {
       setState((prev) => {
         if (!prev) return prev;
         const result = applyAction(prev, action);
-        return result.ok ? result.state : prev;
+        if (!result.ok) {
+          setActionError({ reason: result.error });
+          return prev;
+        }
+        return result.state;
       });
     },
     [],
@@ -101,6 +109,8 @@ export default function LocalHome() {
 
   return (
     <>
+      <ActionErrorToast error={actionError} />
+
       <Board
         view={view}
         seats={seats}
