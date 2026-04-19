@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, use, type ReactNode, useCallback } from 'react';
+import { useEffect, useMemo, useState, use, type ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameSocket } from '@/lib/net/useGameSocket';
 import Board from '@/components/Board';
+import type { WinModalAction } from '@/components/WinModal';
 
 function useSessionId(): string | null {
   const [id, setId] = useState<string | null>(null);
@@ -33,7 +34,49 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
     return () => clearTimeout(id);
   }, [socket.lastActionError]);
 
+  // Pending state for the rematch button so clicking it flips to "Creating…"
+  // immediately instead of waiting for the rematchReady round trip. Cleared
+  // once the server delivers a rematchRoomId.
+  const [rematchPending, setRematchPending] = useState(false);
+  useEffect(() => {
+    if (socket.rematchRoomId) setRematchPending(false);
+  }, [socket.rematchRoomId]);
+
   const onBackToLobby = useCallback(() => router.push('/'), [router]);
+  const onRequestRematch = useCallback(() => {
+    if (socket.rematchRoomId || rematchPending) return;
+    setRematchPending(true);
+    socket.requestRematch();
+  }, [socket, rematchPending]);
+
+  const winActions: WinModalAction[] = useMemo(() => {
+    const back: WinModalAction = {
+      key: 'lobby',
+      label: 'Back to lobby',
+      onClick: onBackToLobby,
+    };
+    if (socket.rematchRoomId) {
+      return [
+        back,
+        {
+          key: 'rematchLink',
+          label: 'Enter rematch →',
+          variant: 'primary',
+          href: `/rooms/${socket.rematchRoomId}`,
+        },
+      ];
+    }
+    return [
+      back,
+      {
+        key: 'rematch',
+        label: rematchPending ? 'Creating rematch…' : 'Keep same group',
+        variant: 'primary',
+        onClick: onRequestRematch,
+        disabled: rematchPending,
+      },
+    ];
+  }, [socket.rematchRoomId, rematchPending, onBackToLobby, onRequestRematch]);
 
   if (!sessionId) return <Frame><Placeholder>Waiting for session id…</Placeholder></Frame>;
 
@@ -71,9 +114,7 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
         seats={seats}
         dispatch={socket.sendAction}
         youSlotIndex={view.youSlotIndex}
-        rematchRoomId={socket.rematchRoomId}
-        onRequestRematch={socket.requestRematch}
-        onBackToLobby={onBackToLobby}
+        winActions={winActions}
       />
     </>
   );
