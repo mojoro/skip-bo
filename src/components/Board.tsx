@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import Link from 'next/link';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { DragDropProvider, DragSourceData, DropTargetData } from '@/lib/dnd';
 import HowToPlay from '@/components/HowToPlay';
@@ -207,7 +208,13 @@ export default function Board({
           {/* Header chrome */}
           <header className="absolute top-2 sm:top-3 left-3 right-3 sm:left-4 sm:right-4 z-20 flex items-center justify-between text-white gap-2">
             <h1 className="text-base sm:text-lg font-bold tracking-widest shrink-0">
-              SKIP<span className="text-[var(--gold)]">·</span>BO
+              <Link
+                href="/"
+                className="hover:text-[var(--gold)] transition-colors"
+                aria-label="Back to lobby"
+              >
+                SKIP<span className="text-[var(--gold)]">·</span>BO
+              </Link>
             </h1>
 
             {/* Status — desktop tabletop only */}
