@@ -148,6 +148,8 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
         dispatch={socket.sendAction}
         youSlotIndex={view.youSlotIndex}
         winActions={winActions}
+        chat={socket.chat}
+        onSendChat={socket.sendChat}
         headerAction={
           view.phase === 'playing' ? (
             <button

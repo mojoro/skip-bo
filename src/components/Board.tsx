@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { DragDropProvider, DragSourceData, DropTargetData } from '@/lib/dnd';
+import GameChatDock from '@/components/GameChatDock';
 import HowToPlay from '@/components/HowToPlay';
 import { MobileBoardView } from '@/components/MobileBoard';
 import RulesetInfo from '@/components/RulesetInfo';
@@ -12,7 +13,7 @@ import TableCenter from '@/components/TableCenter';
 import WinModal, { buildWinHeadline, type WinModalAction } from '@/components/WinModal';
 import { CardSource, GameAction, WILD } from '@/lib/game/types';
 import { getSeatPositions } from '@/lib/layout/seating';
-import type { GameViewSeat, PlayerView } from '@/lib/net/protocol';
+import type { ChatEntry, GameViewSeat, PlayerView } from '@/lib/net/protocol';
 import { buildSeatViewModels } from '@/lib/view/seat';
 
 interface PendingDiscard {
@@ -42,6 +43,10 @@ export interface BoardProps {
   // drops in a "Leave game" button here; /local doesn't need one. Kept as
   // generic content so Board stays transport-agnostic.
   headerAction?: ReactNode;
+  // When supplied, a floating in-game chat dock appears at the bottom-left.
+  // /rooms passes both; /local leaves them undefined so no chat renders.
+  chat?: ChatEntry[];
+  onSendChat?: (text: string) => void;
 }
 
 export default function Board({
@@ -51,6 +56,8 @@ export default function Board({
   youSlotIndex,
   winActions = [],
   headerAction = null,
+  chat,
+  onSendChat,
 }: BoardProps) {
   const [selection, setSelection] = useState<SeatSelection>({ kind: 'none' });
   const [pendingDiscard, setPendingDiscard] = useState<PendingDiscard | null>(null);
@@ -343,6 +350,10 @@ export default function Board({
               />
             )}
           </div>
+
+          {chat && onSendChat && (
+            <GameChatDock chat={chat} onSend={onSendChat} />
+          )}
 
           {/* Win modal */}
           <WinModal
