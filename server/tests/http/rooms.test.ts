@@ -167,6 +167,17 @@ describe('GET /v1/me/room', () => {
     const res = await fetch(`${ctx.url}/v1/me/room`, { headers: { authorization: 'Bearer bound' } });
     expect(await res.json()).toEqual({ roomId: room.id });
   });
+
+  it('reports null for finished rooms even when sessionIndex still points there', async () => {
+    const { room } = ctx.mgr.create({ sessionId: 'bound', playerName: 'B', config: baseConfigBody(), allowAiFill: true, visibility: 'public' });
+    ctx.mgr.addMember(room.id, { sessionId: 'g', playerName: 'G' });
+    ctx.mgr.startGame(room.id, { actorSessionId: 'bound' });
+    ctx.mgr.finishGame(room.id, 'winner');
+    // Post-finish, sockets stay open for rematch — but the lobby should treat
+    // the session as free to create/join since the game is over.
+    const res = await fetch(`${ctx.url}/v1/me/room`, { headers: { authorization: 'Bearer bound' } });
+    expect(await res.json()).toEqual({ roomId: null });
+  });
 });
 
 describe('PATCH /v1/rooms/:id', () => {

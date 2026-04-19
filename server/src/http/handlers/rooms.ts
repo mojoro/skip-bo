@@ -60,15 +60,26 @@ export function listRooms(mgr: RoomManager) {
 // session is already seated somewhere. Unlike the room list, this route
 // requires the bearer header (otherwise an unauthed caller would see
 // `null` and could believe they're unseated when they're not).
+//
+// Finished rooms are reported as unseated: the sessionIndex entry still
+// points at a finished room through the 5-minute cleanup window (kept so
+// sockets can reconnect for rematch requests), but the lobby should treat
+// that session as free to create / join something new. Otherwise the UI
+// dims create + join with no way to "resume" a game that's already over.
 export function getMyRoom(mgr: RoomManager) {
   return (req: IncomingMessage, res: ServerResponse): void => {
     const session = extractBearer(req);
     const instance = '/v1/me/room';
     if (!session) return unauthorized(res, instance);
-    const roomId = mgr.sessionRoomId(session) ?? null;
+    const roomId = mgr.sessionRoomId(session);
+    let reportedRoomId: string | null = null;
+    if (roomId) {
+      const room = mgr.get(roomId);
+      if (room && room.phase !== 'finished') reportedRoomId = roomId;
+    }
     res.statusCode = 200;
     res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ roomId }));
+    res.end(JSON.stringify({ roomId: reportedRoomId }));
   };
 }
 
