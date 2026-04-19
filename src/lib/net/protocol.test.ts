@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ClientMessage, ServerMessage, GameView, PlayerView } from './protocol';
+import type { ClientMessage, ServerMessage, GameView } from './protocol';
 
 describe('protocol shapes', () => {
   it('includes requestRematch in ClientMessage', () => {
@@ -16,20 +16,12 @@ describe('protocol shapes', () => {
 
 describe('PlayerView null view', () => {
   it('accepts view: null for waiting phase', () => {
-    const waiting: PlayerView = {
-      config: { ruleset: 'recommended', stockPileSize: 10, handSize: 5, bidirectionalBuild: true, maxPlayers: 2, partnership: null },
-      phase: 'waiting',
-      turnPhase: 'play',
-      currentPlayerSlotIndex: 0,
-      youSlotIndex: 0,
-      winningTeamIndex: null,
-      stateVersion: 0,
-      buildPiles: [],
-      drawPileCount: 0,
-      you: { name: 'You', hand: [], stockPile: [], discardPiles: [[],[],[],[]] },
-      opponents: [],
+    const view: GameView = {
+      view: null,
+      seats: [],
+      hostSlotIndex: null,
     };
-    expect(waiting.phase).toBe('waiting');
+    expect(view.view).toBeNull();
   });
 
   it('GameView carries hostSlotIndex', () => {
