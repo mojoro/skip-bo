@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { DragDropProvider, DragSourceData, DropTargetData } from '@/lib/dnd';
+import HowToPlay from '@/components/HowToPlay';
 import { MobileBoardView } from '@/components/MobileBoard';
 import RulesetInfo from '@/components/RulesetInfo';
 import { SeatView, SeatSelection } from '@/components/Seat';
@@ -54,6 +55,7 @@ export default function Board({
   const [pendingDiscard, setPendingDiscard] = useState<PendingDiscard | null>(null);
   const [pendingWildPlay, setPendingWildPlay] = useState<PendingWildPlay | null>(null);
   const [rulesetOpen, setRulesetOpen] = useState(false);
+  const [howToPlayOpen, setHowToPlayOpen] = useState(false);
 
   const seatViewModels = useMemo(
     () => buildSeatViewModels({ view, seats, teamColors: TEAM_COLORS }),
@@ -221,6 +223,13 @@ export default function Board({
             <div className="shrink-0 flex items-center gap-2">
               <button
                 type="button"
+                onClick={() => setHowToPlayOpen(true)}
+                className="bg-black/40 hover:bg-black/55 border border-white/15 px-2 sm:px-3 py-1 rounded text-[11px] sm:text-xs text-white/90 whitespace-nowrap"
+              >
+                Rules
+              </button>
+              <button
+                type="button"
                 onClick={() => setRulesetOpen(true)}
                 className="bg-black/40 hover:bg-black/55 border border-white/15 px-2 sm:px-3 py-1 rounded text-[11px] sm:text-xs text-white/90 whitespace-nowrap"
               >
@@ -342,6 +351,8 @@ export default function Board({
 
         </div>
       </div>
+
+      <HowToPlay open={howToPlayOpen} onClose={() => setHowToPlayOpen(false)} />
 
       <RulesetInfo
         open={rulesetOpen}
