@@ -100,6 +100,16 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
 
   const { view, seats } = socket.view;
 
+  // view is null when the room is still in waiting phase (no game started yet).
+  // Task 22 will replace this placeholder with the PreGameRoom component.
+  if (!view) {
+    return (
+      <Frame>
+        <Placeholder>Waiting for the game to start…</Placeholder>
+      </Frame>
+    );
+  }
+
   return (
     <>
       {/* Action error toast — overlays the board */}

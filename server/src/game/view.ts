@@ -50,8 +50,9 @@ export interface PublicPlayerView {
 }
 
 export interface GameView {
-  view: PublicPlayerView;
+  view: PublicPlayerView | null;
   seats: GameViewSeat[];
+  hostSlotIndex: number | null;
 }
 
 function publicizeConfig(room: Room, config: GameConfig): PublicGameConfig {
@@ -127,7 +128,7 @@ export function buildSeats(room: Room): GameViewSeat[] {
   });
 }
 
-export function buildGameView(room: Room, sessionId: string, seats?: GameViewSeat[]): GameView {
+export function buildGameView(room: Room, sessionId: string, seats?: GameViewSeat[]): GameView & { view: PublicPlayerView } {
   if (!room.game) throw new Error('buildGameView: room has no game');
   const raw = getPlayerView(room.game, sessionId);
   // Drop the viewer's own sessionId from `you.id` — the client already holds
@@ -152,5 +153,5 @@ export function buildGameView(room: Room, sessionId: string, seats?: GameViewSea
     you: youRest,
     opponents: publicizeOpponents(room, raw.opponents),
   };
-  return { view, seats: seats ?? buildSeats(room) };
+  return { view, seats: seats ?? buildSeats(room), hostSlotIndex: null };
 }

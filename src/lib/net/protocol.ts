@@ -46,8 +46,9 @@ export interface GameViewSeat {
 }
 
 export interface GameView {
-  view: PlayerView;
+  view: PlayerView | null;
   seats: GameViewSeat[];
+  hostSlotIndex: number | null;
 }
 
 export type ClientMessage =

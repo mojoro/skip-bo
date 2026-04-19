@@ -8,7 +8,7 @@ import type {
   PublicPartnershipRules,
 } from '@/lib/net/protocol';
 
-export function engineStateToView(state: GameState, youPlayerIndex: number): GameView {
+export function engineStateToView(state: GameState, youPlayerIndex: number): GameView & { view: PlayerView } {
   const players = state.players;
   const you = players[youPlayerIndex];
   if (!you) {
@@ -59,7 +59,7 @@ export function engineStateToView(state: GameState, youPlayerIndex: number): Gam
     isHost: i === youPlayerIndex,
   }));
 
-  return { view, seats };
+  return { view, seats, hostSlotIndex: null };
 }
 
 function publicizeConfig(config: GameConfig, players: GameState['players']): PublicGameConfig {
