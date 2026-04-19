@@ -1,8 +1,10 @@
 node_modules
 .next
 .git
-server
 docs
+server/node_modules
+server/dist
+server/coverage
 *.md
 .env*
 .claude
