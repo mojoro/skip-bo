@@ -184,13 +184,12 @@ export default function Board({
 
   const statusText = (() => {
     if (view.phase === 'finished') {
-      if (partnershipActive && view.winningTeamIndex !== null) {
-        return `TEAM ${view.winningTeamIndex + 1} WINS`;
-      }
-      const winner = seatViewModels.find((s) => s.slotIndex === view.winningTeamIndex);
-      return `${(winner?.name ?? 'Player').toUpperCase()} WINS`;
+      return 'Finished';
     }
-    return `${activeSeat?.name ?? '…'} — pick a card, then a target`;
+    if (isYourTurn) {
+      return 'Your turn';
+    }
+    return `${activeSeat?.name ?? '…'}'s turn`;
   })();
 
   return (
@@ -210,12 +209,7 @@ export default function Board({
               style={{ background: 'rgba(0,0,0,0.45)' }}
             >
               <span className={view.phase === 'finished' ? 'text-[var(--gold)] font-bold tracking-wider' : ''}>
-                {view.phase === 'finished' ? statusText : (
-                  <>
-                    <span className="text-[var(--gold)] font-semibold">{activeSeat?.name ?? '…'}</span>
-                    {' '}— pick a card, then a target
-                  </>
-                )}
+                {statusText}
               </span>
             </div>
           </header>
@@ -227,12 +221,7 @@ export default function Board({
               style={{ background: 'rgba(0,0,0,0.45)' }}
             >
               <span className={view.phase === 'finished' ? 'text-[var(--gold)] font-bold tracking-wider' : ''}>
-                {view.phase === 'finished' ? statusText : (
-                  <>
-                    <span className="text-[var(--gold)] font-semibold">{activeSeat?.name ?? '…'}</span>
-                    {' '}— pick a card, then a target
-                  </>
-                )}
+                {statusText}
               </span>
             </div>
           </div>
