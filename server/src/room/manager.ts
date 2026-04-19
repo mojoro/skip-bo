@@ -315,18 +315,24 @@ export class RoomManager {
     const ai = room.slots.filter((s) => s.kind === 'ai').length;
     const open = room.slots.filter((s) => s.kind === 'open').length;
     // At least one human must be at the table — an all-AI game has no owner
-    // to keep the room alive. The engine also needs at least two players
-    // total; an open slot counts since any open seat gets filled with AI
-    // below. `allowAiFill` is no longer a start-time gate: a host who hits
-    // Start before friends arrive is signalling "play me vs bots", so we
-    // fill remaining opens unconditionally. Locked slots remain excluded.
+    // to keep the room alive. Beyond that, count all committed players:
+    //   * humans (seated real players)
+    //   * explicit AI slots (host toggled the seat to AI in SlotList)
+    //   * open slots only when allowAiFill is on (they'll be converted below)
+    // Locked slots are intentional empties and never count.
     if (humans < 1) {
       throw new RoomError('tooFew', 'tooFew: at least one human must be seated.');
     }
-    if (humans + ai + open < 2) {
+    const playable = humans + ai + (room.allowAiFill ? open : 0);
+    if (playable < 2) {
       throw new RoomError('tooFew', 'tooFew: need at least two players.');
     }
-    if (open > 0) fillOpenWithAi(room);
+    if (open > 0) {
+      if (!room.allowAiFill) {
+        throw new RoomError('openSlots', 'Open slots remain; enable AI fill, toggle them to AI, lock them, or wait for players.');
+      }
+      fillOpenWithAi(room);
+    }
     room.phase = 'playing';
     room.game = initializeGameState(room);
     this.touch(room);
