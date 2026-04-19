@@ -146,6 +146,29 @@ describe('GET /v1/rooms config sanitization (C1 audit)', () => {
   });
 });
 
+describe('GET /v1/me/room', () => {
+  let ctx: Awaited<ReturnType<typeof start>>;
+  beforeEach(async () => { ctx = await start(); });
+  afterEach(() => { ctx.server.close(); });
+
+  it('returns 401 without bearer', async () => {
+    const res = await fetch(`${ctx.url}/v1/me/room`);
+    expect(res.status).toBe(401);
+  });
+
+  it('returns { roomId: null } when the session is not seated', async () => {
+    const res = await fetch(`${ctx.url}/v1/me/room`, { headers: { authorization: 'Bearer lonely' } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ roomId: null });
+  });
+
+  it('returns the current room id when the session is seated', async () => {
+    const { room } = ctx.mgr.create({ sessionId: 'bound', playerName: 'B', config: baseConfigBody(), allowAiFill: true, visibility: 'public' });
+    const res = await fetch(`${ctx.url}/v1/me/room`, { headers: { authorization: 'Bearer bound' } });
+    expect(await res.json()).toEqual({ roomId: room.id });
+  });
+});
+
 describe('PATCH /v1/rooms/:id', () => {
   let ctx: Awaited<ReturnType<typeof start>>;
   beforeEach(async () => { ctx = await start(); });

@@ -54,6 +54,24 @@ export function listRooms(mgr: RoomManager) {
   };
 }
 
+// `GET /v1/me/room` — looks up the caller's current room via the bearer
+// sessionId. Returns `{ roomId: string | null }`. The lobby uses this to
+// show a "resume your game" affordance and gate create/join when the
+// session is already seated somewhere. Unlike the room list, this route
+// requires the bearer header (otherwise an unauthed caller would see
+// `null` and could believe they're unseated when they're not).
+export function getMyRoom(mgr: RoomManager) {
+  return (req: IncomingMessage, res: ServerResponse): void => {
+    const session = extractBearer(req);
+    const instance = '/v1/me/room';
+    if (!session) return unauthorized(res, instance);
+    const roomId = mgr.sessionRoomId(session) ?? null;
+    res.statusCode = 200;
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ roomId }));
+  };
+}
+
 export function getRoom(mgr: RoomManager) {
   return (_req: IncomingMessage, res: ServerResponse, params: Record<string, string>): void => {
     const room = mgr.get(params.id!);

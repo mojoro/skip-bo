@@ -7,7 +7,7 @@ import { handleUnknown, writeProblem } from './middleware/errorHandler';
 import { problemResponse } from '../problemJson';
 import { Router } from './router';
 import type { RoomManager } from '../room/manager';
-import { postRoom, listRooms, getRoom, patchRoom } from './handlers/rooms';
+import { postRoom, listRooms, getRoom, patchRoom, getMyRoom } from './handlers/rooms';
 import { postMember, deleteMember } from './handlers/members';
 import { putSlot } from './handlers/slots';
 import { postGame } from './handlers/game';
@@ -90,6 +90,7 @@ export function mountRoutes(
   mgr: RoomManager,
   extras: { registry?: LobbyStreamRegistry } = {},
 ): void {
+  router.add('GET', '/v1/me/room', getMyRoom(mgr));
   router.add('GET', '/v1/rooms', listRooms(mgr));
   router.add('POST', '/v1/rooms', postRoom(mgr));
   router.add('GET', '/v1/rooms/:id', getRoom(mgr));
