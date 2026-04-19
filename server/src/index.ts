@@ -7,6 +7,7 @@ import { startStatsTicker } from './stats';
 import { installShutdown } from './shutdown';
 import { GameRegistry } from './game/registry';
 import { createGameUpgradeHandler } from './game/handshake';
+import { broadcastRoomState } from './game/broadcast';
 
 function main(): void {
   if (process.env.NODE_ENV === 'production' && config.corsOrigin === '*') {
@@ -34,6 +35,15 @@ function main(): void {
   roomManager.onMemberDisplaced((roomId, sessionId) => {
     const conn = gameRegistry.findBySession(roomId, sessionId);
     if (conn) conn.close(4002, 'kicked');
+  });
+  // Fan-out room state to all connected waiting-phase sockets whenever a REST
+  // mutation changes the room (member join/leave, slot config, game start).
+  // After startGame the phase is 'playing' and buildGameView returns a full
+  // PlayerView, so waiting sockets automatically transition to the Board.
+  roomManager.onWaitingStateChange((roomId) => {
+    const room = roomManager.get(roomId);
+    if (!room) return;
+    broadcastRoomState(room, gameRegistry);
   });
 
   const { httpServer, router } = buildHttpServer({

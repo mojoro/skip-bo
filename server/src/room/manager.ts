@@ -64,6 +64,16 @@ export class RoomManager {
     return () => this.internalEvents.off('memberDisplaced', handler);
   }
 
+  // Fires after any REST mutation that changes room state visible to connected
+  // waiting-phase sockets: addMember, removeMember, setSlot, markUpdated, and
+  // startGame. Consumers (game layer) subscribe to fan-out a `state` frame to
+  // every WS-connected session in the room so their pre-game lobby view stays
+  // live without polling.
+  onWaitingStateChange(handler: (roomId: string) => void): () => void {
+    this.internalEvents.on('waitingStateChange', handler);
+    return () => this.internalEvents.off('waitingStateChange', handler);
+  }
+
   create(input: CreateRoomInput): { room: Room } {
     if (this.sessionIndex.has(input.sessionId)) {
       throw new RoomError('sessionAlreadySeated', `Session ${input.sessionId} is already seated in a room.`);
@@ -154,6 +164,7 @@ export class RoomManager {
     this.sessionIndex.set(input.sessionId, room.id);
     this.touch(room);
     this.emitRoomUpdated(room);
+    this.emitStateChange(room);
     return { slotIndex };
   }
 
@@ -193,6 +204,7 @@ export class RoomManager {
     }
     this.touch(room);
     this.emitRoomUpdated(room);
+    this.emitStateChange(room);
   }
 
   setSlot(
@@ -238,6 +250,7 @@ export class RoomManager {
     }
     this.touch(room);
     this.emitRoomUpdated(room);
+    this.emitStateChange(room);
   }
 
   startGame(roomId: string, opts: { actorSessionId: string }): void {
@@ -264,6 +277,7 @@ export class RoomManager {
     this.touch(room);
     this.clearIdleTimer(room);
     this.emitRoomRemoved(room);
+    this.emitStateChange(room);
   }
 
   finishGame(roomId: string, reason: FinishReason): void {
@@ -376,6 +390,7 @@ export class RoomManager {
   markUpdated(room: Room): void {
     this.touch(room);
     this.emitRoomUpdated(room);
+    this.emitStateChange(room);
   }
 
   // Hand the host role to another human when the current host is bot-
@@ -481,6 +496,10 @@ export class RoomManager {
         room: projectRoomInfo(room, { context: 'list' }),
       });
     }
+  }
+
+  private emitStateChange(room: Room): void {
+    this.internalEvents.emit('waitingStateChange', room.id);
   }
 
   private allocateCode(): string {
