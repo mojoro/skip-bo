@@ -7,7 +7,7 @@ import { startStatsTicker } from './stats';
 import { installShutdown } from './shutdown';
 import { GameRegistry } from './game/registry';
 import { createGameUpgradeHandler } from './game/handshake';
-import { broadcastRoomState } from './game/broadcast';
+import { broadcastRoomState, driveRoomAfterStateChange } from './game/broadcast';
 
 function main(): void {
   if (process.env.NODE_ENV === 'production' && config.corsOrigin === '*') {
@@ -44,6 +44,11 @@ function main(): void {
     const room = roomManager.get(roomId);
     if (!room) return;
     broadcastRoomState(room, gameRegistry);
+    // Fire the bot chain + win-detection after broadcasting. Critical when
+    // startGame lands with an AI seat as the first player — nothing else
+    // would trigger maybeRunBotTurn until a human moved, so the game would
+    // hang indefinitely.
+    driveRoomAfterStateChange(room, gameRegistry, roomManager);
   });
 
   const { httpServer, router } = buildHttpServer({

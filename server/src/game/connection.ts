@@ -6,7 +6,7 @@ import { ClientMessageSchema, type ServerMessage } from './protocol';
 import { dispatchMessage } from './dispatch';
 import { buildGameView, buildSeats } from './view';
 import { startGrace, cancelGrace } from './grace';
-import { maybeRunBotTurn } from './bot';
+import { driveRoomAfterStateChange } from './broadcast';
 import { logger } from '../logger';
 
 const HEARTBEAT_MS = 25_000;
@@ -207,29 +207,11 @@ export class GameConnection implements RegisteredConnection {
   }
 
   private onAfterCommit(): void {
-    if (this.room.game && this.room.game.phase === 'finished') {
-      const stateVersion = this.room.game.stateVersion;
-      const endSeats = buildSeats(this.room);
-      this.registry.forEachInRoom(this.room.id, (conn) => {
-        try {
-          const view = buildGameView(this.room, conn.sessionId, endSeats);
-          const msg: ServerMessage = { type: 'gameEnded', stateVersion, view, reason: 'winner' };
-          conn.send(msg);
-        } catch { /* ignore */ }
-      });
-      // finishGame flips the room to 'finished' and schedules post-game
-      // cleanup; it does NOT close sockets. Keeping them alive lets the
-      // finished-state WinModal accept `requestRematch` over the same
-      // connection. The cleanup timer fires roomClosed after FINISH_CLEANUP_MS.
-      this.manager.finishGame(this.room.id, 'winner');
-      return;
-    }
-    maybeRunBotTurn(this.room, {
-      onAfterMove: () => {
-        this.broadcastState();
-        this.onAfterCommit();
-      },
-    });
+    // Shared helper handles gameEnded fan-out + finishGame when the engine
+    // reports a winner, or schedules the next bot turn otherwise. The same
+    // helper is called from the onRoomStateChange subscriber so startGame
+    // and REST-driven state changes drive bots too.
+    driveRoomAfterStateChange(this.room, this.registry, this.manager);
   }
 
   private startHeartbeat(): void {
@@ -278,9 +260,7 @@ export class GameConnection implements RegisteredConnection {
             return;
           }
           this.broadcastState();
-          maybeRunBotTurn(this.room, {
-            onAfterMove: () => { this.broadcastState(); this.onAfterCommit(); },
-          });
+          driveRoomAfterStateChange(this.room, this.registry, this.manager);
         },
       });
     }

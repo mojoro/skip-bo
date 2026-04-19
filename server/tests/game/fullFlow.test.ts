@@ -8,6 +8,7 @@ import { GameRegistry } from '../../src/game/registry';
 import { createGameUpgradeHandler } from '../../src/game/handshake';
 import { __setGraceMsForTest } from '../../src/game/grace';
 import { __setFinishCleanupMsForTest } from '../../src/room/lifecycle';
+import { broadcastRoomState, driveRoomAfterStateChange } from '../../src/game/broadcast';
 
 async function startHarness() {
   const mgr = new RoomManager();
@@ -21,6 +22,15 @@ async function startHarness() {
   // server/src/index.ts installs.
   mgr.onRoomClosed((roomId) => {
     gameRegistry.forEachInRoom(roomId, (conn) => conn.close(4005, 'room closed'));
+  });
+  // Mirror `index.ts`: fan out state + drive bots on every REST-driven
+  // state change. Without this, startGame broadcasts nothing and bot-first
+  // games hang because no bot turn ever gets scheduled.
+  mgr.onRoomStateChange((roomId) => {
+    const room = mgr.get(roomId);
+    if (!room) return;
+    broadcastRoomState(room, gameRegistry);
+    driveRoomAfterStateChange(room, gameRegistry, mgr);
   });
   await new Promise<void>((r) => httpServer.listen(0, r));
   const { port } = httpServer.address() as AddressInfo;
@@ -160,6 +170,51 @@ describe('game ws full flow', () => {
     expect(botMove.stateVersion).toBeGreaterThan(initialVersion);
 
     guest.ws.close();
+  });
+
+  it('bot-first starting player plays a move without any human input', async () => {
+    // User-reported: "when the bot is the first to play, it never moves."
+    // Before the fix, `startGame` broadcast the opening state but nothing
+    // kicked off maybeRunBotTurn — the chain only ran after a human action.
+    // Now `onRoomStateChange` drives the bot via `driveRoomAfterStateChange`.
+    h = await startHarness();
+    const { room } = h.mgr.create({
+      sessionId: 'solo-host',
+      playerName: 'Host',
+      config: { ruleset: 'recommended', stockPileSize: 5, handSize: 5, bidirectionalBuild: true, maxPlayers: 2, partnership: null },
+      allowAiFill: false,
+      visibility: 'public',
+    });
+    h.mgr.setSlot(room.id, 1, { kind: 'ai', difficulty: 'easy' }, { actorSessionId: 'solo-host' });
+    const host = await open(h.wsBase, room.id, 'solo-host');
+    expect(host.hello.view.view).toBeNull();
+
+    h.mgr.startGame(room.id, { actorSessionId: 'solo-host' });
+
+    const firstState = await nextJson(host.ws, (m) => m.type === 'state' && m.view.view !== null, 2000);
+    const initialVersion = firstState.stateVersion as number;
+
+    // Always pin the bot (slot 1) as the starting player so we deterministically
+    // exercise the bot-first path. The recommended ruleset picks the starter
+    // by top-of-stock otherwise. Reach-in matches the grace-expiry pattern.
+    const roomRef = h.mgr.get(room.id)!;
+    roomRef.game!.currentPlayerIndex = 1;
+    roomRef.game!.stateVersion = initialVersion + 1;
+    broadcastRoomState(roomRef, h.gameRegistry);
+    driveRoomAfterStateChange(roomRef, h.gameRegistry, h.mgr);
+
+    // Bot moves within BOT_MOVE_DELAY_MS (800ms default). After the move the
+    // current player advances off slot 1.
+    const botMove = await nextJson(
+      host.ws,
+      (m) =>
+        m.type === 'state'
+        && m.stateVersion > initialVersion + 1
+        && m.view.view.currentPlayerSlotIndex !== 1,
+      2500,
+    );
+    expect(botMove.stateVersion).toBeGreaterThan(initialVersion + 1);
+    host.ws.close();
   });
 
   it('finishGame keeps sockets open for rematch; post-game cleanup closes them 4005', async () => {
