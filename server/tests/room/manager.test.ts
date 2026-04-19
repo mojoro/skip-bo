@@ -215,3 +215,157 @@ describe('RoomManager roomRemoved dedup', () => {
     }
   });
 });
+
+describe('RoomManager.createRematchRoom', () => {
+  function makePlayingRoom() {
+    const mgr = new RoomManager();
+    const { room } = mgr.create({
+      sessionId: 'sess-alice',
+      playerName: 'Alice',
+      config: { ruleset: 'recommended', stockPileSize: 5, handSize: 5, bidirectionalBuild: true, maxPlayers: 2, partnership: null },
+      allowAiFill: false,
+      visibility: 'public',
+    });
+    mgr.addMember(room.id, { sessionId: 'sess-bob', playerName: 'Bob' });
+    mgr.startGame(room.id, { actorSessionId: 'sess-alice' });
+    return { mgr, room };
+  }
+
+  it('creates a new room in playing phase with a game state already initialized', () => {
+    const { mgr, room } = makePlayingRoom();
+    mgr.finishGame(room.id, 'winner');
+    const seatedHumans = room.slots
+      .filter((s) => s.kind === 'human')
+      .map((s) => ({
+        sessionId: (s as Extract<typeof s, { kind: 'human' }>).sessionId,
+        name: (s as Extract<typeof s, { kind: 'human' }>).name,
+        slotIndex: room.slots.indexOf(s),
+      }));
+
+    const { room: next } = mgr.createRematchRoom({ sourceRoom: room, seatedHumans });
+    expect(next.phase).toBe('playing');
+    expect(next.game).not.toBeNull();
+    expect(next.config.ruleset).toBe(room.config.ruleset);
+    expect(next.config.maxPlayers).toBe(room.config.maxPlayers);
+  });
+
+  it('pre-seats each human at their original slot index with botControlled=true', () => {
+    const { mgr, room } = makePlayingRoom();
+    mgr.finishGame(room.id, 'winner');
+    const originals = room.slots.map((s, i) => ({ slot: s, i }));
+    const seatedHumans = originals
+      .filter((x) => x.slot.kind === 'human')
+      .map((x) => ({
+        sessionId: (x.slot as Extract<typeof x.slot, { kind: 'human' }>).sessionId,
+        name: (x.slot as Extract<typeof x.slot, { kind: 'human' }>).name,
+        slotIndex: x.i,
+      }));
+
+    const { room: next } = mgr.createRematchRoom({ sourceRoom: room, seatedHumans });
+    for (const entry of seatedHumans) {
+      const slot = next.slots[entry.slotIndex];
+      expect(slot).toBeDefined();
+      expect(slot!.kind).toBe('human');
+      if (slot && slot.kind === 'human') {
+        expect(slot.sessionId).toBe(entry.sessionId);
+        expect(slot.name).toBe(entry.name);
+        expect(slot.connected).toBe(false);
+        expect(slot.botControlled).toBe(true);
+        expect(slot.graceDeadline).toBeNull();
+      }
+    }
+  });
+
+  it('migrates each seated sessionIndex from source to new room atomically', () => {
+    const { mgr, room } = makePlayingRoom();
+    mgr.finishGame(room.id, 'winner');
+    const seatedHumans = room.slots
+      .map((slot, i) => ({ slot, i }))
+      .filter((x) => x.slot.kind === 'human')
+      .map((x) => ({
+        sessionId: (x.slot as Extract<typeof x.slot, { kind: 'human' }>).sessionId,
+        name: (x.slot as Extract<typeof x.slot, { kind: 'human' }>).name,
+        slotIndex: x.i,
+      }));
+    const { room: next } = mgr.createRematchRoom({ sourceRoom: room, seatedHumans });
+    for (const s of seatedHumans) {
+      expect(mgr.sessionRoomId(s.sessionId)).toBe(next.id);
+    }
+  });
+
+  it('sets hostSessionId to the first seated human (slot 0)', () => {
+    const { mgr, room } = makePlayingRoom();
+    mgr.finishGame(room.id, 'winner');
+    const seatedHumans = room.slots
+      .map((slot, i) => ({ slot, i }))
+      .filter((x) => x.slot.kind === 'human')
+      .map((x) => ({
+        sessionId: (x.slot as Extract<typeof x.slot, { kind: 'human' }>).sessionId,
+        name: (x.slot as Extract<typeof x.slot, { kind: 'human' }>).name,
+        slotIndex: x.i,
+      }));
+    const { room: next } = mgr.createRematchRoom({ sourceRoom: room, seatedHumans });
+    expect(next.hostSessionId).toBe(seatedHumans[0]!.sessionId);
+  });
+
+  it('generates a fresh seed so the cloned config does not replay the original shuffle', () => {
+    const { mgr, room } = makePlayingRoom();
+    mgr.finishGame(room.id, 'winner');
+    const seatedHumans = room.slots
+      .map((slot, i) => ({ slot, i }))
+      .filter((x) => x.slot.kind === 'human')
+      .map((x) => ({
+        sessionId: (x.slot as Extract<typeof x.slot, { kind: 'human' }>).sessionId,
+        name: (x.slot as Extract<typeof x.slot, { kind: 'human' }>).name,
+        slotIndex: x.i,
+      }));
+    const { room: next } = mgr.createRematchRoom({ sourceRoom: room, seatedHumans });
+    if (room.config.seed !== undefined && next.config.seed !== undefined) {
+      expect(next.config.seed).not.toBe(room.config.seed);
+    }
+  });
+
+  it('does not delete reassigned sessionIndex entries when source room cleanup fires', () => {
+    const { mgr, room } = makePlayingRoom();
+    mgr.finishGame(room.id, 'winner');
+    const seatedHumans = room.slots
+      .map((slot, i) => ({ slot, i }))
+      .filter((x) => x.slot.kind === 'human')
+      .map((x) => ({
+        sessionId: (x.slot as Extract<typeof x.slot, { kind: 'human' }>).sessionId,
+        name: (x.slot as Extract<typeof x.slot, { kind: 'human' }>).name,
+        slotIndex: x.i,
+      }));
+    const { room: next } = mgr.createRematchRoom({ sourceRoom: room, seatedHumans });
+    // Force-trigger the source room's deletion (post-game cleanup path).
+    (mgr as any).deleteRoom(room, { reason: 'postGame' });
+    for (const s of seatedHumans) {
+      expect(mgr.sessionRoomId(s.sessionId)).toBe(next.id);
+    }
+  });
+
+  it('clones AI slots and leaves open/locked slots as-is', () => {
+    const mgr = new RoomManager();
+    const { room } = mgr.create({
+      sessionId: 'sess-alice',
+      playerName: 'Alice',
+      config: { ruleset: 'recommended', stockPileSize: 5, handSize: 5, bidirectionalBuild: true, maxPlayers: 4, partnership: null },
+      allowAiFill: false,
+      visibility: 'public',
+    });
+    room.slots[1] = { kind: 'ai', botId: 'bot-123', difficulty: 'easy' };
+    room.slots[2] = { kind: 'locked' };
+    // slot 3 remains 'open' — we flip phase manually below to bypass startGame's
+    // open-slots guard rather than toggling allowAiFill (would convert the open
+    // slot into AI and mask the "open stays open" assertion).
+    room.phase = 'finished';
+    room.finishedAt = Date.now();
+    const seatedHumans = [
+      { sessionId: 'sess-alice', name: 'Alice', slotIndex: 0 },
+    ];
+    const { room: next } = mgr.createRematchRoom({ sourceRoom: room, seatedHumans });
+    expect(next.slots[1]!.kind).toBe('ai');
+    expect(next.slots[2]!.kind).toBe('locked');
+    expect(next.slots[3]!.kind).toBe('open');
+  });
+});

@@ -20,6 +20,15 @@ export interface CreateRoomInput {
   visibility: Visibility;
 }
 
+export interface CreateRematchRoomInput {
+  sourceRoom: Room;
+  seatedHumans: Array<{
+    sessionId: string;
+    name: string;
+    slotIndex: number;
+  }>;
+}
+
 export class RoomError extends Error {
   constructor(public readonly reason: string, message: string) {
     super(message);
@@ -274,6 +283,83 @@ export class RoomManager {
     this.internalEvents.emit('roomClosed', room.id);
   }
 
+  createRematchRoom(input: CreateRematchRoomInput): { room: Room } {
+    const { sourceRoom, seatedHumans } = input;
+    const id = randomUUID();
+    const code = this.allocateCode();
+    const now = Date.now();
+
+    // Build slots: clone source structure, replace each seated slot with the
+    // bot-controlled human entry. Slots not named in seatedHumans keep their
+    // source shape (ai / open / locked).
+    const slots: Room['slots'] = sourceRoom.slots.map((slot) => {
+      if (slot.kind === 'ai') return { ...slot };
+      if (slot.kind === 'locked') return { kind: 'locked' as const };
+      return { kind: 'open' as const };
+    });
+    for (const entry of seatedHumans) {
+      slots[entry.slotIndex] = {
+        kind: 'human',
+        sessionId: entry.sessionId,
+        name: entry.name,
+        connected: false,
+        joinedAt: now,
+        graceDeadline: null,
+        graceTimer: null,
+        botControlled: true,
+      };
+    }
+
+    const firstSeated = seatedHumans[0];
+    const hostSessionId = firstSeated ? firstSeated.sessionId : '';
+
+    // Fresh seed so the new shuffle differs from the source game.
+    const config: GameConfig = {
+      ...sourceRoom.config,
+      seed: Math.floor(Math.random() * 0xffffffff),
+    };
+
+    const room: Room = {
+      id,
+      code,
+      displayName: `${sourceRoom.displayName} (rematch)`,
+      visibility: sourceRoom.visibility,
+      phase: 'waiting',
+      hostSessionId,
+      config,
+      allowAiFill: sourceRoom.allowAiFill,
+      slots,
+      game: null,
+      createdAt: now,
+      lastActivityAt: now,
+      finishedAt: null,
+      kickedSessionIds: new Set(),
+      idleTimer: null,
+      cleanupTimer: null,
+      botPending: new Set<number>(),
+    };
+
+    this.rooms.set(id, room);
+    this.codeIndex.set(code, id);
+    // Atomic sessionIndex migration: retarget each seated human's mapping to the new room.
+    for (const entry of seatedHumans) {
+      this.sessionIndex.set(entry.sessionId, id);
+    }
+
+    // Start the game immediately.
+    room.game = initializeGameState(room);
+    room.phase = 'playing';
+
+    if (room.visibility === 'public') {
+      this.events.emit('roomAdded', {
+        type: 'roomAdded',
+        room: projectRoomInfo(room, { context: 'list' }),
+      });
+    }
+    this.scheduleIdle(room);
+    return { room };
+  }
+
   stats(): { gamesInProgress: number; playersOnline: number } {
     let games = 0;
     const sessions = new Set<string>();
@@ -343,7 +429,11 @@ export class RoomManager {
     this.rooms.delete(room.id);
     this.codeIndex.delete(room.code);
     for (const slot of room.slots) {
-      if (slot.kind === 'human') this.sessionIndex.delete(slot.sessionId);
+      if (slot.kind !== 'human') continue;
+      // Only delete if still pointing to this room (createRematchRoom migrates entries atomically).
+      if (this.sessionIndex.get(slot.sessionId) === room.id) {
+        this.sessionIndex.delete(slot.sessionId);
+      }
     }
     this.clearIdleTimer(room);
     if (room.cleanupTimer) {
