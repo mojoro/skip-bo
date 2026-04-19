@@ -6,6 +6,7 @@ import { useGameSocket } from '@/lib/net/useGameSocket';
 import Board from '@/components/Board';
 import { PreGameRoom } from '@/components/room/PreGameRoom';
 import type { WinModalAction } from '@/components/WinModal';
+import { leaveRoom } from '@/lib/net/api';
 
 function useSessionId(): string | null {
   const [id, setId] = useState<string | null>(null);
@@ -103,6 +104,17 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
 
   const baseUrl = process.env.NEXT_PUBLIC_GAME_API_URL ?? 'http://localhost:8787';
 
+  const handleLeaveGame = async () => {
+    // Confirm before forfeiting — the server flips the seat to bot-controlled
+    // and the game continues without the user. Also ends the game outright if
+    // no other live humans remain.
+    if (!window.confirm('Leave this game? Your seat will finish out with a bot.')) return;
+    try {
+      await leaveRoom({ baseUrl, sessionId, roomId, targetSessionId: sessionId });
+    } catch { /* navigate anyway — socket close + lobby refetch will converge */ }
+    router.push('/');
+  };
+
   if (!view) {
     return (
       <PreGameRoom
@@ -135,6 +147,17 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
         dispatch={socket.sendAction}
         youSlotIndex={view.youSlotIndex}
         winActions={winActions}
+        headerAction={
+          view.phase === 'playing' ? (
+            <button
+              type="button"
+              onClick={handleLeaveGame}
+              className="bg-black/40 hover:bg-black/55 border border-white/15 px-2 sm:px-3 py-1 rounded text-[11px] sm:text-xs text-white/90 whitespace-nowrap"
+            >
+              Leave game
+            </button>
+          ) : null
+        }
       />
     </>
   );

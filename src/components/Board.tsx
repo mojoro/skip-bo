@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { DragDropProvider, DragSourceData, DropTargetData } from '@/lib/dnd';
 import { MobileBoardView } from '@/components/MobileBoard';
@@ -35,6 +35,10 @@ export interface BoardProps {
   // these — /local offers "Play again / New Game / Play online", /rooms
   // offers rematch + back-to-lobby. Empty or omitted = no buttons (dev use).
   winActions?: WinModalAction[];
+  // Rendered in the top-right of the felt, on top of the tabletop. /rooms
+  // drops in a "Leave game" button here; /local doesn't need one. Kept as
+  // generic content so Board stays transport-agnostic.
+  headerAction?: ReactNode;
 }
 
 export default function Board({
@@ -43,6 +47,7 @@ export default function Board({
   dispatch,
   youSlotIndex,
   winActions = [],
+  headerAction = null,
 }: BoardProps) {
   const [selection, setSelection] = useState<SeatSelection>({ kind: 'none' });
   const [pendingDiscard, setPendingDiscard] = useState<PendingDiscard | null>(null);
@@ -210,6 +215,10 @@ export default function Board({
                 {statusText}
               </span>
             </div>
+
+            {headerAction && (
+              <div className="shrink-0 flex items-center">{headerAction}</div>
+            )}
           </header>
 
           {/* Status ribbon — mobile or compact fallback */}
