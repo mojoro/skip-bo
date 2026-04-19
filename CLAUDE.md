@@ -120,6 +120,20 @@ src/
     └── superpowers/specs/           # brainstorming specs (if added)
 ```
 
+Deploy + infrastructure (repo root):
+
+```
+Dockerfile.web              # Next.js standalone build → web container
+docker-compose.yml          # orchestrates web + srv on the host
+.dockerignore               # keeps both image build contexts lean
+server/Dockerfile           # esbuild + pm2-runtime image for the WS+REST server
+deploy/
+├── bootstrap.sh            # one-time Amazon Linux 2023 host setup
+├── deploy.sh               # repeatable laptop → host deploy + nginx sync
+├── nginx.conf              # production nginx (TLS, WS upgrade, security headers)
+└── README.md               # operations runbook
+```
+
 ## What's next (prioritized)
 
 No major sections remain. Remaining items are small cleanups from the follow-ups list.
