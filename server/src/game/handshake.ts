@@ -100,7 +100,8 @@ export function createGameUpgradeHandler(deps: HandshakeDeps): GameUpgradeHandle
       // "Start" a moment ago, or the game may have just ended. Use 4006 so
       // the client's terminal-code set lets it retry after backoff instead
       // of freezing on a "Connection closed" screen.
-      if (room.phase !== 'playing') {
+      // waiting + playing are both live phases; finished rooms are done.
+      if (room.phase !== 'playing' && room.phase !== 'waiting') {
         wss.handleUpgrade(req, socket, head, (ws) => {
           socket.removeListener('error', onSocketError);
           ws.close(4006, 'room not playing');

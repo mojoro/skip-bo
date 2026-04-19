@@ -82,21 +82,18 @@ describe('game ws handshake', () => {
     expect(res.code).toBe(4003);
   });
 
-  it('waiting-phase connection gets a non-terminal 4006, not 4003', async () => {
+  it('finished-phase connection gets non-terminal 4006, not 4003', async () => {
     h = await startHarness();
     // Separate bearer so the shared createRoom rate-limit bucket — keyed on
     // bearer+remoteAddress, follow-up #9 in CLAUDE.md — doesn't starve the
     // next test when this one also creates a room.
-    const create = await fetch(`${h.base}/v1/rooms`, {
-      method: 'POST',
-      headers: { authorization: 'Bearer wait-host', 'content-type': 'application/json' },
-      body: JSON.stringify({ playerName: 'Host', config: { ruleset: 'recommended', stockPileSize: 10, handSize: 5, bidirectionalBuild: true, maxPlayers: 2, partnership: null }, allowAiFill: false, visibility: 'public' }),
-    });
-    const { roomId } = (await create.json()) as { roomId: string };
-    // Valid session + real room, but the host has not started yet — the
-    // client races the "Start Game" click. Closing 4003 would flip this to
-    // terminal client-side, so we use 4006 to signal "retry after backoff".
-    const ws = new WebSocket(`${h.wsBase}/rooms/${roomId}/game?sessionId=wait-host`);
+    const { roomId, host } = await startGameAndGetRoomId(h, { host: 'fin-host', guest: 'fin-guest' });
+    // Fast-path the room to finished phase without going through the game engine.
+    h.mgr.finishGame(roomId, 'winner');
+    // Valid session + real room, but the room has just finished — closing 4003
+    // would flip this to terminal client-side, so we use 4006 to signal
+    // "retry after backoff" (e.g. the client should redirect to lobby).
+    const ws = new WebSocket(`${h.wsBase}/rooms/${roomId}/game?sessionId=${host}`);
     const res = await waitForClose(ws);
     expect(res.code).toBe(4006);
   });
@@ -145,6 +142,26 @@ describe('game ws handshake', () => {
       sock.write(headers);
     });
     expect(status).toMatch(/^HTTP\/1\.1 403/);
+  });
+
+  it('accepts upgrade when phase === waiting and sends hello with view.view === null', async () => {
+    h = await startHarness();
+    // Use a unique bearer so this test's createRoom call doesn't collide with
+    // the shared module-level rate-limit bucket (follow-up #9 in CLAUDE.md).
+    const create = await fetch(`${h.base}/v1/rooms`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer waiting-accept-host', 'content-type': 'application/json' },
+      body: JSON.stringify({ playerName: 'Host', config: { ruleset: 'recommended', stockPileSize: 10, handSize: 5, bidirectionalBuild: true, maxPlayers: 2, partnership: null }, allowAiFill: false, visibility: 'public' }),
+    });
+    const { roomId } = (await create.json()) as { roomId: string };
+    // Room is in waiting phase — game has not started yet.
+    const ws = new WebSocket(`${h.wsBase}/rooms/${roomId}/game?sessionId=waiting-accept-host`);
+    const msg = await waitForMessage(ws);
+    expect(msg).toMatchObject({ type: 'hello', stateVersion: 0 });
+    const hello = msg as { type: 'hello'; view: { view: unknown; seats: unknown[] } };
+    expect(hello.view.view).toBeNull();
+    expect(hello.view.seats.length).toBeGreaterThanOrEqual(1);
+    ws.close();
   });
 
   it('stale close after duplicate-session kick leaves live slot state intact', async () => {

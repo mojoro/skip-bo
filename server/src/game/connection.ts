@@ -116,9 +116,8 @@ export class GameConnection implements RegisteredConnection {
   }
 
   private sendHello(): void {
-    if (!this.room.game) { this.close(1008, 'no game'); return; }
     const view = buildGameView(this.room, this.sessionId);
-    const hello: ServerMessage = { type: 'hello', stateVersion: this.room.game.stateVersion, view };
+    const hello: ServerMessage = { type: 'hello', stateVersion: this.room.game?.stateVersion ?? 0, view };
     this.send(hello);
   }
 
