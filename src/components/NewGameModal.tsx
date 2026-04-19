@@ -25,6 +25,8 @@ interface NewGameModalProps {
   onCancel: () => void;
   onStart: (settings: NewGameSettings) => void;
   defaultPlayerCount?: number;
+  initial?: NewGameSettings;
+  editMode?: boolean;
 }
 
 function rulesetDefaults(ruleset: Ruleset, playerCount: number): NewGameSettings {
@@ -46,14 +48,16 @@ export default function NewGameModal({
   onCancel,
   onStart,
   defaultPlayerCount = 2,
+  initial,
+  editMode = false,
 }: NewGameModalProps) {
   const [settings, setSettings] = useState<NewGameSettings>(() =>
-    rulesetDefaults('recommended', defaultPlayerCount),
+    initial ?? rulesetDefaults('recommended', defaultPlayerCount),
   );
 
   useEffect(() => {
-    if (open) setSettings(rulesetDefaults('recommended', defaultPlayerCount));
-  }, [open, defaultPlayerCount]);
+    if (open) setSettings(initial ?? rulesetDefaults('recommended', defaultPlayerCount));
+  }, [open, defaultPlayerCount, initial]);
 
   if (!open) return null;
 
@@ -124,17 +128,21 @@ export default function NewGameModal({
 
         {/* Players */}
         <section className="flex flex-col gap-2">
-          <label className="text-xs uppercase text-zinc-400">Players</label>
+          <label className="text-xs uppercase text-zinc-400">
+            Players{editMode && <span className="ml-2 text-zinc-500 normal-case">(locked)</span>}
+          </label>
           <div className="flex gap-1 flex-wrap">
             {[2, 3, 4, 5, 6, 7, 8].map((n) => (
               <button
                 key={n}
-                onClick={() => setPlayerCount(n)}
+                disabled={editMode}
+                aria-disabled={editMode}
+                onClick={() => !editMode && setPlayerCount(n)}
                 className={`w-10 h-10 rounded ${
                   settings.playerCount === n
                     ? 'bg-yellow-500 text-zinc-900 font-semibold'
                     : 'bg-zinc-700 hover:bg-zinc-600'
-                }`}
+                } ${editMode ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {n}
               </button>
