@@ -23,6 +23,12 @@ Single-pass audit of branch `feature/section-6.5-lobby`, implemented by a Sonnet
 | `8a79127` | Always fill open slots with AI at startGame so solo vs bot works (UX round 4 — superseded) |
 | `fadc3d2` | Drive bots after REST state changes so bot-first games progress (UX round 5) |
 | `22fa43f` | Restore allowAiFill gate on open-seat conversion at startGame (UX round 5) |
+| `b930aa0` | Show room join code in the waiting room with copy-to-clipboard (UX round 6) |
+| `ce80bb4` | Resolve game server base URL from the page hostname for LAN play (UX round 7) |
+| `a0a357e` | Allow LAN origins in Next dev via allowedDevOrigins (UX round 7) |
+| `63e1c32` | Count lobby subscribers toward the players online stat (UX round 8) |
+| `f7c4df8` | Fall back to getRandomValues for sessionId when randomUUID is missing (UX round 9) |
+| `127b615` | Fall back to execCommand copy when clipboard API is unavailable (UX round 9) |
 
 ## Findings
 
@@ -77,8 +83,10 @@ Section 3's A1/A2 ratchet (`server/src/game/view.ts:publicizeConfig`) already sa
 
 ## Verification
 
-- Server suite: 153/153 after round 5 (was 152 after round 4, 151 after round 3, 148 after round 2, 142 after round 1, 139 before fixes; +14 regression tests total).
-- Root suite: 142/142 after round 5 (+1 for Start button behavior).
+- Server suite: 153/153 through round 9 (was 139 before fixes; +14 regression tests total).
+- Root suite: 142/142 through round 9.
+- Server typecheck: clean.
+- Root typecheck: unchanged — pre-existing follow-up #13 only.
 - Server typecheck: clean.
 - Root typecheck: still fails only on pre-existing follow-up #13 (`@engine/*` alias under `server/`), unchanged.
 - Not browser-verified: fixes are on wire-shape + server internals; existing Playwright walk-through from Task 26 still describes the UI end-to-end behavior.
@@ -194,6 +202,54 @@ Regression: `server/tests/game/fullFlow.test.ts` now includes a test that create
 `canStart` and the Start button tooltip mirror the rule. The tooltip now says "Toggle open slots to AI, lock them, or enable AI fill" when the gate fails. Replaced the round-4 "solo vs AI without toggling fill" regression with a test that explicitly toggles slot 1 to AI and starts successfully.
 
 **Files:** `server/src/room/manager.ts`, `server/tests/room/lifecycle.test.ts`, `src/components/room/StartButton.tsx`, `src/components/room/StartButton.test.tsx`.
+
+## Round 6 — share-by-code affordance
+
+### F1 (UX gap). Waiting room had no way to share the join code
+
+**Bug.** The server generates a short room code at create time and lobby SSE carries it on `RoomInfo` (visible to public rooms in the list, via direct fetch for private), but the pre-game WaitingRoom had no display for it. A host using a private room could not share the code with a friend without going back to the lobby and scraping the URL.
+
+**Fix.** `GameView` gains a `code: string` field populated from `room.code` in `buildGameView`. The `PreGameRoom` header renders a gold-bordered pill `CODE · <code>` with a "Copy" button that writes to clipboard; the label flips to "Copied" for 1.5 s. The code isn't sensitive — anyone already in the room is free to share it — so it rides the same broadcast rather than requiring a separate REST call.
+
+**Files:** `server/src/game/view.ts`, `src/lib/net/protocol.ts`, `src/components/room/PreGameRoom.tsx`, `src/app/rooms/[roomId]/page.tsx`.
+
+## Round 7 — LAN play
+
+### F2 (Blocked flow). LAN peers couldn't reach the game server
+
+**Bug.** `.env.local` pinned `NEXT_PUBLIC_GAME_{API,WS}_URL=http(s)://localhost:8787`. A phone on the LAN loading `http://<host-ip>:3000` had its browser try to open `ws://localhost:8787` — its own machine, not the host's. Even deleting the env vars didn't help: the `useGameSocket` fallback read `window.location.host`, which includes the dev server's `:3000`, not the game server's `:8787`.
+
+**Fix.** New `src/lib/net/endpoints.ts` with `gameApiBaseUrl()` + `gameWsBaseUrl()` that resolve in this order: explicit env var (for prod deploys), else `${window.location.protocol}//${window.location.hostname}:8787` (works for both single-device dev and LAN peers), else an SSR-safe `localhost:8787`. All three callsites (`useGameSocket`, `app/page.tsx`, `app/rooms/[roomId]/page.tsx`) now route through the helpers. `.env.local` got commented-out hints for prod use.
+
+Also added `allowedDevOrigins: ['192.168.0.29', 'localhost', '127.0.0.1']` to `next.config.ts` so the Next dev server accepts cross-origin requests from LAN peers.
+
+**Files:** `src/lib/net/endpoints.ts`, `src/lib/net/useGameSocket.ts`, `src/app/page.tsx`, `src/app/rooms/[roomId]/page.tsx`, `.env.local`, `next.config.ts`.
+
+## Round 8 — players-online count
+
+### F3 (UX gap). Lobby subscribers not counted as online
+
+**Bug.** `RoomManager.stats().playersOnline` only counted humans with `slot.connected === true`. A person browsing the lobby who hadn't joined a room was invisible to the "N online" chip — misleading since they're plainly online.
+
+**Fix.** `LobbyStreamRegistry.sessionIds()` and `RoomManager.seatedSessionIds()` / `gamesInProgress()` expose the underlying data. `startStatsTicker` unions both sets (Set-based dedupe so a session that's both seated and subscribed counts once) and publishes the composite via the existing `statsUpdate` event. Propagates through the 2-second poll cadence already in place.
+
+**Files:** `server/src/sse/registry.ts`, `server/src/room/manager.ts`, `server/src/stats.ts`.
+
+## Round 9 — LAN HTTP insecure-context APIs
+
+### F4 (Blocked flow). `crypto.randomUUID` missing on LAN HTTP
+
+**Bug.** `crypto.randomUUID()` is gated to secure contexts — HTTPS or localhost. A phone on the LAN loading `http://<host-ip>:3000` sees `crypto.randomUUID` as undefined, so the `useSessionId` hook threw "crypto.randomUUID is not a function" on first visit and the page never rendered past that.
+
+**Fix.** New `src/lib/net/uuid.ts` feature-detects `crypto.randomUUID` and falls back to a `crypto.getRandomValues()`-based UUID v4 (still exposed in insecure contexts). Both `useSessionId` instances call the wrapper.
+
+### F5 (UX polish, same root cause). Copy-code button silently failed on LAN HTTP
+
+**Bug.** `navigator.clipboard.writeText` is also gated to secure contexts. The round-6 "Copy" button try/caught the error so it didn't crash, but the click did nothing useful on a LAN phone.
+
+**Fix.** The button now falls back to the legacy `document.execCommand('copy')` path with a hidden textarea when `navigator.clipboard` is unavailable. Copy works on every browser on the LAN now.
+
+**Files:** `src/lib/net/uuid.ts`, `src/app/page.tsx`, `src/app/rooms/[roomId]/page.tsx`, `src/components/room/PreGameRoom.tsx`.
 
 ## Minor findings noted but not fixed
 
