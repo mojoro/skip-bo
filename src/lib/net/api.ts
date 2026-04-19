@@ -138,6 +138,19 @@ export interface FindRoomByCodeInput {
   code: string;
 }
 
+export interface GetMyRoomInput extends WithAuth {}
+
+// Resolves the session's current room via `/v1/me/room`. Returns null when
+// the session is not seated. Used by the lobby to show a "resume your game"
+// banner and disable create/join forms while a session is already in a room.
+export async function getMyRoom(input: GetMyRoomInput): Promise<{ roomId: string | null }> {
+  const res = await fetch(`${input.baseUrl}/v1/me/room`, {
+    method: 'GET',
+    headers: authHeaders(input.sessionId),
+  });
+  return parseResponse(res);
+}
+
 export async function findRoomByCode(input: FindRoomByCodeInput): Promise<RoomInfo | null> {
   const res = await fetch(
     `${input.baseUrl}/v1/rooms?code=${encodeURIComponent(input.code)}`,
