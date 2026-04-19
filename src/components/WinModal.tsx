@@ -1,54 +1,34 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { SeatViewModel } from '@/lib/view/seat';
+
+export interface WinModalAction {
+  key: string;
+  label: string;
+  // 'primary' renders the gold CTA; 'secondary' renders the dark neutral button.
+  variant?: 'primary' | 'secondary';
+  // Either an internal link (Next.js navigation) or a click handler. If both
+  // are set, `href` wins. Both unset produces a disabled button.
+  href?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+}
+
+export interface WinModalHeadline {
+  title: string;
+  subtitle: string | null;
+}
 
 export interface WinModalProps {
   open: boolean;
-  phase: 'playing' | 'finished' | 'waiting';
-  endedReason: 'winner' | 'abandoned' | null;
-  winningTeamIndex: number | null;
-  partnershipTeams: number[][] | null;
-  seats: SeatViewModel[];
-  rematchRoomId: string | null;
-  onRequestRematch: () => void;
-  onBackToLobby: () => void;
+  headline: WinModalHeadline;
+  actions: WinModalAction[];
 }
 
-export default function WinModal(props: WinModalProps) {
-  const {
-    open, phase, endedReason, winningTeamIndex, partnershipTeams, seats,
-    rematchRoomId, onRequestRematch, onBackToLobby,
-  } = props;
-  const [requested, setRequested] = useState(false);
-
-  useEffect(() => {
-    if (!open) setRequested(false);
-  }, [open]);
-
-  useEffect(() => {
-    if (rematchRoomId) setRequested(false);
-  }, [rematchRoomId]);
-
-  if (!open || phase !== 'finished') return null;
-
-  const headline = buildHeadline(endedReason, winningTeamIndex, partnershipTeams, seats);
-
-  const rematchLabel = rematchRoomId
-    ? 'Enter rematch →'
-    : requested
-      ? 'Creating rematch…'
-      : 'Keep same group';
-
-  const rematchDisabled = requested && !rematchRoomId;
-
-  const handleRematchClick = () => {
-    if (rematchRoomId) return;
-    setRequested(true);
-    onRequestRematch();
-  };
-
+export default function WinModal({ open, headline, actions }: WinModalProps) {
+  if (!open) return null;
   return (
     <div
       className="absolute inset-0 z-30 flex items-center justify-center p-4"
@@ -65,32 +45,10 @@ export default function WinModal(props: WinModalProps) {
           {headline.subtitle && (
             <p className="text-sm text-white/80 mb-6">{headline.subtitle}</p>
           )}
-
           <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
-            <button
-              type="button"
-              onClick={onBackToLobby}
-              className="bg-black/40 hover:bg-black/55 border border-white/15 px-4 py-2 rounded text-white text-sm"
-            >
-              Back to lobby
-            </button>
-            {rematchRoomId ? (
-              <Link
-                href={`/rooms/${rematchRoomId}`}
-                className="bg-[var(--gold)] text-stone-900 font-semibold hover:brightness-110 px-4 py-2 rounded text-sm"
-              >
-                {rematchLabel}
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={handleRematchClick}
-                disabled={rematchDisabled}
-                className="bg-[var(--gold)] text-stone-900 font-semibold hover:brightness-110 px-4 py-2 rounded text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {rematchLabel}
-              </button>
-            )}
+            {actions.map((a) => (
+              <ActionButton key={a.key} action={a} />
+            ))}
           </div>
         </div>
       </div>
@@ -98,17 +56,41 @@ export default function WinModal(props: WinModalProps) {
   );
 }
 
-interface Headline {
-  title: string;
-  subtitle: string | null;
+function ActionButton({ action }: { action: WinModalAction }): ReactNode {
+  const base =
+    'px-4 py-2 rounded text-sm disabled:opacity-60 disabled:cursor-not-allowed';
+  const variant =
+    action.variant === 'primary'
+      ? 'bg-[var(--gold)] text-stone-900 font-semibold hover:brightness-110'
+      : 'bg-black/40 hover:bg-black/55 border border-white/15 text-white';
+  const cls = `${base} ${variant}`;
+  if (action.href && !action.disabled) {
+    return (
+      <Link href={action.href} className={cls}>
+        {action.label}
+      </Link>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={action.onClick}
+      disabled={action.disabled || (!action.onClick && !action.href)}
+      className={cls}
+    >
+      {action.label}
+    </button>
+  );
 }
 
-function buildHeadline(
-  endedReason: WinModalProps['endedReason'],
+// Shared headline derivation so /local and /rooms can build identical copy
+// without forking the winningTeamIndex + partnership name resolution logic.
+export function buildWinHeadline(
+  endedReason: 'winner' | 'abandoned' | null,
   winningTeamIndex: number | null,
   partnershipTeams: number[][] | null,
   seats: SeatViewModel[],
-): Headline {
+): WinModalHeadline {
   if (endedReason === 'abandoned') {
     return { title: 'Game abandoned', subtitle: 'The remaining players have left the game.' };
   }

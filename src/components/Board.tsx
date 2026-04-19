@@ -6,7 +6,7 @@ import { DragDropProvider, DragSourceData, DropTargetData } from '@/lib/dnd';
 import { MobileBoardView } from '@/components/MobileBoard';
 import { SeatView, SeatSelection } from '@/components/Seat';
 import TableCenter from '@/components/TableCenter';
-import WinModal from '@/components/WinModal';
+import WinModal, { buildWinHeadline, type WinModalAction } from '@/components/WinModal';
 import { CardSource, GameAction, WILD } from '@/lib/game/types';
 import { getSeatPositions } from '@/lib/layout/seating';
 import type { GameViewSeat, PlayerView } from '@/lib/net/protocol';
@@ -31,9 +31,10 @@ export interface BoardProps {
   seats: GameViewSeat[];
   dispatch: (action: GameAction) => void;
   youSlotIndex: number;
-  rematchRoomId?: string | null;
-  onRequestRematch?: () => void;
-  onBackToLobby?: () => void;
+  // Buttons shown in the win modal after the game finishes. Callers compose
+  // these — /local offers "Play again / New Game / Play online", /rooms
+  // offers rematch + back-to-lobby. Empty or omitted = no buttons (dev use).
+  winActions?: WinModalAction[];
 }
 
 export default function Board({
@@ -41,9 +42,7 @@ export default function Board({
   seats,
   dispatch,
   youSlotIndex,
-  rematchRoomId = null,
-  onRequestRematch = () => {},
-  onBackToLobby = () => {},
+  winActions = [],
 }: BoardProps) {
   const [selection, setSelection] = useState<SeatSelection>({ kind: 'none' });
   const [pendingDiscard, setPendingDiscard] = useState<PendingDiscard | null>(null);
@@ -180,7 +179,6 @@ export default function Board({
   const opponentSeats = seatViewModels.filter((s) => s.slotIndex !== youSlotIndex);
 
   const activeSeat = seatViewModels.find((s) => s.slotIndex === view.currentPlayerSlotIndex);
-  const partnershipActive = !!view.config.partnership?.enabled;
 
   const statusText = (() => {
     if (view.phase === 'finished') {
@@ -315,14 +313,13 @@ export default function Board({
           {/* Win modal */}
           <WinModal
             open={view.phase === 'finished'}
-            phase={view.phase}
-            endedReason={view.phase === 'finished' ? 'winner' : null}
-            winningTeamIndex={view.winningTeamIndex}
-            partnershipTeams={view.config.partnership?.teams ?? null}
-            seats={seatViewModels}
-            rematchRoomId={rematchRoomId}
-            onRequestRematch={onRequestRematch}
-            onBackToLobby={onBackToLobby}
+            headline={buildWinHeadline(
+              view.phase === 'finished' ? 'winner' : null,
+              view.winningTeamIndex,
+              view.config.partnership?.teams ?? null,
+              seatViewModels,
+            )}
+            actions={winActions}
           />
 
         </div>
