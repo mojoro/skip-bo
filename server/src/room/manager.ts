@@ -450,15 +450,31 @@ export class RoomManager {
   }
 
   stats(): { gamesInProgress: number; playersOnline: number } {
-    let games = 0;
-    const sessions = new Set<string>();
+    return {
+      gamesInProgress: this.gamesInProgress(),
+      playersOnline: this.seatedSessionIds().length,
+    };
+  }
+
+  // SessionIds of humans currently attached to a room via the game WebSocket.
+  // The stats ticker unions this with lobby subscribers so the count reflects
+  // both in-room players and folks browsing the lobby pre-join.
+  seatedSessionIds(): string[] {
+    const ids: string[] = [];
     for (const room of this.rooms.values()) {
-      if (room.phase === 'playing') games++;
       for (const slot of room.slots) {
-        if (slot.kind === 'human' && slot.connected) sessions.add(slot.sessionId);
+        if (slot.kind === 'human' && slot.connected) ids.push(slot.sessionId);
       }
     }
-    return { gamesInProgress: games, playersOnline: sessions.size };
+    return ids;
+  }
+
+  gamesInProgress(): number {
+    let count = 0;
+    for (const room of this.rooms.values()) {
+      if (room.phase === 'playing') count++;
+    }
+    return count;
   }
 
   allRooms(): Room[] { return [...this.rooms.values()]; }

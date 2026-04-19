@@ -34,4 +34,15 @@ export class LobbyStreamRegistry {
   size(): number {
     return [...this.subscribers.values()].filter((w) => !w.closed).length;
   }
+
+  // SessionIds of every active subscriber. Used by the stats ticker to
+  // union with seated humans so the "players online" count includes lobby
+  // viewers who haven't joined a room yet.
+  sessionIds(): string[] {
+    const ids: string[] = [];
+    for (const [sessionId, writer] of this.subscribers) {
+      if (!writer.closed) ids.push(sessionId);
+    }
+    return ids;
+  }
 }
