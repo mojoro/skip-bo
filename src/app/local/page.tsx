@@ -96,23 +96,21 @@ export default function LocalHome() {
   }
 
   return (
-    <div className="relative">
-      {/* New Game button floats over the Board header */}
-      <div className="absolute top-4 right-4 sm:top-5 sm:right-5 z-30">
-        <button
-          onClick={() => setNewGameOpen(true)}
-          className="bg-[var(--gold)] text-stone-900 font-semibold hover:brightness-110 px-2 sm:px-3 py-1 rounded text-[11px] sm:text-xs whitespace-nowrap"
-        >
-          New Game
-        </button>
-      </div>
-
+    <>
       <Board
         view={view}
         seats={seats}
         dispatch={dispatch}
         youSlotIndex={state.currentPlayerIndex}
         winActions={winActions}
+        headerAction={
+          <button
+            onClick={() => setNewGameOpen(true)}
+            className="bg-[var(--gold)] text-stone-900 font-semibold hover:brightness-110 px-2 sm:px-3 py-1 rounded text-[11px] sm:text-xs whitespace-nowrap"
+          >
+            New Game
+          </button>
+        }
       />
 
       <NewGameModal
@@ -121,6 +119,6 @@ export default function LocalHome() {
         onStart={startGame}
         defaultPlayerCount={state.players.length}
       />
-    </div>
+    </>
   );
 }
