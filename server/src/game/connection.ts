@@ -218,10 +218,10 @@ export class GameConnection implements RegisteredConnection {
           conn.send(msg);
         } catch { /* ignore */ }
       });
-      // finishGame synchronously emits `roomClosed`, which the index.ts
-      // subscriber turns into a 4005 close on every socket in the room. The
-      // ws library serializes the already-queued `gameEnded` frame before
-      // the close frame, so clients receive both in order without a timer.
+      // finishGame flips the room to 'finished' and schedules post-game
+      // cleanup; it does NOT close sockets. Keeping them alive lets the
+      // finished-state WinModal accept `requestRematch` over the same
+      // connection. The cleanup timer fires roomClosed after FINISH_CLEANUP_MS.
       this.manager.finishGame(this.room.id, 'winner');
       return;
     }

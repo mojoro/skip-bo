@@ -49,10 +49,10 @@ function waitForJson(ws: WebSocket, pred: (m: any) => boolean, timeoutMs = 3000)
   });
 }
 
-// Start a room with two humans and open WS connections for both, then
-// flip the in-memory room to 'finished' without calling finishGame()
-// (which would emit roomClosed and 4005-close the sockets). This lets
-// tests exercise the requestRematch path while both sockets are alive.
+// Start a room with two humans, open WS connections for both, then call the
+// real finishGame() path. finishGame keeps the sockets alive (by design — the
+// WinModal needs them open to ship requestRematch over the same connection),
+// so tests exercise the actual production flow rather than a mutated shortcut.
 async function connectAndFinish(h: Awaited<ReturnType<typeof startHarness>>) {
   const { room } = h.mgr.create({
     sessionId: 'sess-host', playerName: 'Host',
@@ -64,9 +64,13 @@ async function connectAndFinish(h: Awaited<ReturnType<typeof startHarness>>) {
   // Open sockets while room.phase === 'playing' (handshake requires it).
   const host = await open(h.wsBase, room.id, 'sess-host');
   const guest = await open(h.wsBase, room.id, 'sess-guest');
-  // Flip to finished without calling finishGame() so sockets stay alive.
-  room.phase = 'finished';
-  if (room.game) room.game.phase = 'finished';
+  // Drive the real finishGame path — sockets must stay alive afterwards.
+  h.mgr.finishGame(room.id, 'winner');
+  // Short settle to let any (buggy) close frame land before we pin the
+  // invariant that sockets are still usable for requestRematch.
+  await new Promise((r) => setTimeout(r, 20));
+  if (host.ws.readyState !== host.ws.OPEN) throw new Error(`host socket closed after finishGame (${host.ws.readyState})`);
+  if (guest.ws.readyState !== guest.ws.OPEN) throw new Error(`guest socket closed after finishGame (${guest.ws.readyState})`);
   return { room, host, guest };
 }
 

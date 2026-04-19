@@ -277,10 +277,10 @@ export class RoomManager {
     clearAllGraceTimers(room);
     this.scheduleCleanup(room);
     this.emitRoomRemoved(room);
-    // Private rooms never reach the `roomRemoved` subscriber; fire the
-    // internal channel so their game sockets drop here instead of limping
-    // until the 5-minute post-game deleteRoom.
-    this.internalEvents.emit('roomClosed', room.id);
+    // Sockets stay open past finishGame so the finished-state WinModal can
+    // accept `requestRematch` messages over the same connection. They get
+    // closed with 4005 when the post-game cleanup timer runs deleteRoom,
+    // which fires roomClosed on its own.
   }
 
   createRematchRoom(input: CreateRematchRoomInput): { room: Room } {

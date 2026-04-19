@@ -4,7 +4,14 @@ import type { Room, FinishReason, Slot } from '../types';
 import { randomUUID } from 'node:crypto';
 
 export const IDLE_MS = 30 * 60 * 1000;
-export const FINISH_CLEANUP_MS = 5 * 60 * 1000;
+const DEFAULT_FINISH_CLEANUP_MS = 5 * 60 * 1000;
+export let FINISH_CLEANUP_MS = DEFAULT_FINISH_CLEANUP_MS;
+
+// Test-only override so rematch and cleanup flows can be exercised without
+// idling the suite for 5 real minutes. Passing null restores the default.
+export function __setFinishCleanupMsForTest(ms: number | null): void {
+  FINISH_CLEANUP_MS = ms ?? DEFAULT_FINISH_CLEANUP_MS;
+}
 
 export function migrateHost(room: Room): 'migrated' | 'empty' {
   const humans = room.slots

@@ -7,6 +7,7 @@ import { LobbyStreamRegistry } from '../../src/sse/registry';
 import { GameRegistry } from '../../src/game/registry';
 import { createGameUpgradeHandler } from '../../src/game/handshake';
 import { __setGraceMsForTest } from '../../src/game/grace';
+import { __setFinishCleanupMsForTest } from '../../src/room/lifecycle';
 
 async function startHarness() {
   const mgr = new RoomManager();
@@ -83,6 +84,7 @@ describe('game ws full flow', () => {
   let h: Awaited<ReturnType<typeof startHarness>>;
   afterEach(async () => {
     __setGraceMsForTest(null);
+    __setFinishCleanupMsForTest(null);
     if (h) await h.close();
   });
 
@@ -160,16 +162,23 @@ describe('game ws full flow', () => {
     guest.ws.close();
   });
 
-  it('finishGame drives roomClosed which closes every game socket with 4005', async () => {
-    // Reviewer I-4: the 4005 close path is owned by the roomClosed subscriber
-    // wired in server/src/index.ts. Proving it here pins that contract so a
-    // future refactor that moves or removes the subscriber trips this test.
+  it('finishGame keeps sockets open for rematch; post-game cleanup closes them 4005', async () => {
+    // Sockets must survive finishGame so the finished-state WinModal can
+    // accept `requestRematch` over the same connection. The 4005 drop is
+    // owned by deleteRoom when the post-game cleanup timer runs.
+    __setFinishCleanupMsForTest(100);
     h = await startHarness();
     const { roomId } = await startRoom(h, { host: 'end-host', guest: 'end-guest' });
     const host = await open(h.wsBase, roomId, 'end-host');
     const guest = await open(h.wsBase, roomId, 'end-guest');
 
     h.mgr.finishGame(roomId, 'winner');
+    // finishGame is synchronous; a short delay lets any (buggy) close frame
+    // arrive before we assert the sockets are still alive.
+    await new Promise((r) => setTimeout(r, 30));
+    expect(host.ws.readyState).toBe(1); // OPEN
+    expect(guest.ws.readyState).toBe(1);
+
     const [hostClose, guestClose] = await Promise.all([waitForClose(host.ws), waitForClose(guest.ws)]);
     expect(hostClose.code).toBe(4005);
     expect(guestClose.code).toBe(4005);
