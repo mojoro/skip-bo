@@ -120,6 +120,28 @@ describe('lifecycle', () => {
     expect(mgr.sessionRoomId('a')).toBeUndefined();
   });
 
+  it('startGame counts AI slots toward the 2-player minimum', () => {
+    const { room } = mgr.create({ sessionId: 'h', playerName: 'H', config: baseConfig(), allowAiFill: false, visibility: 'public' });
+    // Host solo (1 human) + converts two open seats to AI + locks one.
+    mgr.setSlot(room.id, 1, { kind: 'ai', difficulty: 'easy' }, { actorSessionId: 'h' });
+    mgr.setSlot(room.id, 2, { kind: 'ai', difficulty: 'easy' }, { actorSessionId: 'h' });
+    mgr.setSlot(room.id, 3, { kind: 'locked' }, { actorSessionId: 'h' });
+    mgr.startGame(room.id, { actorSessionId: 'h' });
+    expect(room.phase).toBe('playing');
+  });
+
+  it('session freed from a finished room can create a new one', () => {
+    const { room } = mgr.create({ sessionId: 'h', playerName: 'H', config: baseConfig(), allowAiFill: true, visibility: 'public' });
+    mgr.addMember(room.id, { sessionId: 'a', playerName: 'A' });
+    mgr.startGame(room.id, { actorSessionId: 'h' });
+    mgr.finishGame(room.id, 'winner');
+    // Finished rooms should not pin the session — the user is back in the
+    // lobby and should be able to start something new.
+    expect(() =>
+      mgr.create({ sessionId: 'h', playerName: 'H', config: baseConfig(), allowAiFill: true, visibility: 'public' }),
+    ).not.toThrow();
+  });
+
   it('finish cleans up after 5 minutes', () => {
     const { room } = mgr.create({ sessionId: 'h', playerName: 'H', config: baseConfig(), allowAiFill: true, visibility: 'public' });
     mgr.addMember(room.id, { sessionId: 'a', playerName: 'A' });

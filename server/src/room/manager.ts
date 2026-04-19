@@ -77,7 +77,7 @@ export class RoomManager {
   }
 
   create(input: CreateRoomInput): { room: Room } {
-    if (this.sessionIndex.has(input.sessionId)) {
+    if (this.isSessionSeatedElsewhere(input.sessionId)) {
       throw new RoomError('sessionAlreadySeated', `Session ${input.sessionId} is already seated in a room.`);
     }
     const id = randomUUID();
@@ -135,6 +135,25 @@ export class RoomManager {
     return this.sessionIndex.get(sessionId);
   }
 
+  // sessionIndex holds entries through the post-finish cleanup window so
+  // sockets can reconnect for rematch requests. That same entry would
+  // otherwise make `create` and `addMember` reject with
+  // `sessionAlreadySeated` when the user returns to the lobby after a game
+  // ended. "Seated elsewhere" here means: a live (waiting or playing) room
+  // still has this session. Finished rooms and stale pointers to deleted
+  // rooms are ignored; any stale entry is cleaned up as a side-effect so
+  // the next call doesn't have to repeat the check.
+  private isSessionSeatedElsewhere(sessionId: string): boolean {
+    const mappedId = this.sessionIndex.get(sessionId);
+    if (!mappedId) return false;
+    const room = this.rooms.get(mappedId);
+    if (!room || room.phase === 'finished') {
+      this.sessionIndex.delete(sessionId);
+      return false;
+    }
+    return true;
+  }
+
   addMember(
     roomId: string,
     input: { sessionId: string; playerName: string },
@@ -146,7 +165,7 @@ export class RoomManager {
     if (room.kickedSessionIds.has(input.sessionId)) {
       throw new RoomError('kicked', 'Session was kicked from this room.');
     }
-    if (this.sessionIndex.has(input.sessionId)) {
+    if (this.isSessionSeatedElsewhere(input.sessionId)) {
       throw new RoomError('sessionAlreadySeated', `Session ${input.sessionId} is already seated in a room.`);
     }
     const slotIndex = room.slots.findIndex((s) => s.kind === 'open');
@@ -293,13 +312,23 @@ export class RoomManager {
       throw new RoomError('phase', 'Room has already started.');
     }
     const humans = room.slots.filter((s) => s.kind === 'human').length;
+    const ai = room.slots.filter((s) => s.kind === 'ai').length;
     const open = room.slots.filter((s) => s.kind === 'open').length;
-    if (humans < 2 && !(room.allowAiFill && humans >= 1 && humans + open >= 2)) {
+    // At least one human must be at the table — an all-AI game has no owner
+    // to keep the room alive. Beyond that, any mix of human + already-placed
+    // AI + (soon-to-be-AI-filled) open slots counts toward the playable
+    // total. Explicitly placed AI slots were not counted pre-audit, so a
+    // solo host toggling a seat to AI could never start.
+    if (humans < 1) {
+      throw new RoomError('tooFew', 'tooFew: at least one human must be seated.');
+    }
+    const playable = humans + ai + (room.allowAiFill ? open : 0);
+    if (playable < 2) {
       throw new RoomError('tooFew', 'tooFew: need at least two players.');
     }
     if (open > 0) {
       if (!room.allowAiFill) {
-        throw new RoomError('openSlots', 'Open slots remain; enable AI fill or wait for players.');
+        throw new RoomError('openSlots', 'Open slots remain; enable AI fill, lock them, or wait for players.');
       }
       fillOpenWithAi(room);
     }
