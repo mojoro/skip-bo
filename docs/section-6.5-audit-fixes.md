@@ -12,6 +12,12 @@ Single-pass audit of branch `feature/section-6.5-lobby`, implemented by a Sonnet
 | `f7fc368` | Omit partnership from PreGameRoom config patch body |
 | `1ee7afd` | Log broadcast fan-out errors instead of swallowing them silently |
 | `f2d8486` | Rename waitingStateChange event to roomStateChange for accuracy |
+| `df4efb0` | Allow self-leave during play via bot-takeover of the seat (UX round 2) |
+| `09d7a14` | End abandoned games when no live human remains (UX round 2) |
+| `4916ab8` | Add GET /v1/me/room for session-to-room lookups (UX round 2) |
+| `76c733a` | Add useMySessionRoom hook with focus-driven refetch (UX round 2) |
+| `5082f67` | Surface resume-your-game banner and disable joins when seated (UX round 2) |
+| `50dfaab` | Add Leave game button to the in-play Board header (UX round 2) |
 
 ## Findings
 
@@ -66,11 +72,47 @@ Section 3's A1/A2 ratchet (`server/src/game/view.ts:publicizeConfig`) already sa
 
 ## Verification
 
-- Server suite: 142/142 (was 139/139 before fixes; +3 regression tests).
-- Root suite: 138/138 (unchanged — fixes were server-side type shape only).
+- Server suite: 148/148 after round 2 (was 142 after round 1, 139 before fixes; +9 regression tests).
+- Root suite: 139/139 after round 2 (+1 for the seated-session resume/disable behavior).
 - Server typecheck: clean.
 - Root typecheck: still fails only on pre-existing follow-up #13 (`@engine/*` alias under `server/`), unchanged.
 - Not browser-verified: fixes are on wire-shape + server internals; existing Playwright walk-through from Task 26 still describes the UI end-to-end behavior.
+
+## Round 2 findings — lifecycle & navigation gaps
+
+The initial lobby shipped without enough affordances to recover from an in-progress game. Two browsers that joined each other and then navigated back to `/` both (a) saw the lobby but could not create or join another room because `sessionAlreadySeated` still held, and (b) had no link back to their active room. When both humans wandered off, the grace timers flipped both seats to bot-controlled and the game ran AI-vs-AI to completion in an empty room.
+
+### C2 (Critical — lifecycle). No way to leave an in-progress game
+
+**Bug.** `Board` during play exposed no "leave game" affordance; closing the tab was the only out. Combined with the sessionIndex binding, that produced the "locked in a ghost room" state described above.
+
+**Fix.** `removeMember` now accepts self-leave during `phase === 'playing'`: the seat flips to `botControlled = true`, any grace timer is cleared, the sessionIndex entry is freed, and host migration runs if the leaver was host. `/rooms/[roomId]` renders a "Leave game" button in the Board header while `view.phase === 'playing'` (via a new `Board.headerAction` prop), wired to `leaveRoom()` + `router.push('/')`. Behind a `window.confirm` so an accidental click doesn't forfeit.
+
+**Files:** `server/src/room/manager.ts`, `server/tests/room/manager.test.ts`, `server/tests/room/lifecycle.test.ts`, `src/components/Board.tsx`, `src/app/rooms/[roomId]/page.tsx`.
+
+### C3 (Critical — lifecycle). Abandoned rooms ran AI-vs-AI forever
+
+**Bug.** When every human in a playing room ended up bot-controlled (grace-expiry or explicit leave), nothing ended the game. Bots played each other to a winner over a room no live player was watching. The only cleanup trigger was the post-finish 5-minute timer, which only fires *after* `finishGame` runs — never reached for fully-abandoned games.
+
+**Fix.** New `RoomManager.tryEndAbandonedGame(room)`: scans `room.slots` for a human entry with `botControlled === false`. If none exists and the room is still playing, calls `finishGame(roomId, 'abandoned')` (which triggers the existing cleanup path). Invoked from both terminal branches that can produce all-bot state:
+- `connection.ts:handleClose` inside the grace-expiry callback, right after `migrateHostAwayFromBot`.
+- `RoomManager.removeMember` on playing-phase self-leave, right after the seat flip.
+
+The definition of "live human" deliberately excludes `botControlled === true` but includes disconnected-but-in-grace sessions, so a transient flap doesn't abandon the game out from under a reconnecting player.
+
+**Files:** `server/src/room/manager.ts`, `server/src/game/connection.ts`, `server/tests/room/lifecycle.test.ts`.
+
+### C4 (Critical — UX). Seated sessions had no way back to their room
+
+**Bug.** After navigating to `/` (via the browser back button or the WinModal's "Play online" CTA), a session that was still bound to an active room saw the full lobby but every "Join" and "Create" call failed with `409 sessionAlreadySeated`. No link existed to the active room short of browser history.
+
+**Fix.**
+- Server: `GET /v1/me/room` authenticated via Bearer sessionId, returns `{ roomId: string | null }`. Mounted ahead of the other `/v1/rooms/*` routes so path precedence doesn't shadow it.
+- Client: new `useMySessionRoom({ baseUrl, sessionId })` hook that fetches once on mount and re-fetches on window `focus` + `visibilitychange` events — the browser-back case reliably fires one of those.
+- `Lobby` consumes the hook. When `roomId` is set it renders a gold "You're in a game — Resume →" banner linked to `/rooms/${roomId}`, dims the create + join-by-code forms (`pointer-events-none`), and sets a `disabledReason` tooltip on every RoomCard's Join button explaining the lock.
+- `roomId === undefined` (fetch in flight) is distinct from `null` (confirmed unseated) so the lobby doesn't flicker the banner in during the initial fetch.
+
+**Files:** `server/src/http/handlers/rooms.ts`, `server/src/http/server.ts`, `server/tests/http/rooms.test.ts`, `src/lib/net/api.ts`, `src/lib/net/useMySessionRoom.ts`, `src/components/lobby/Lobby.tsx`, `src/components/lobby/RoomList.tsx`, `src/components/lobby/RoomCard.tsx`, `src/app/page.integration.test.tsx`.
 
 ## Minor findings noted but not fixed
 
