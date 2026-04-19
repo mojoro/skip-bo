@@ -128,8 +128,19 @@ export function buildSeats(room: Room): GameViewSeat[] {
   });
 }
 
-export function buildGameView(room: Room, sessionId: string, seats?: GameViewSeat[]): GameView & { view: PublicPlayerView } {
-  if (!room.game) throw new Error('buildGameView: room has no game');
+function resolveHostSlotIndex(room: Room): number | null {
+  const idx = room.slots.findIndex(
+    (s) => s.kind === 'human' && s.sessionId === room.hostSessionId,
+  );
+  return idx >= 0 ? idx : null;
+}
+
+export function buildGameView(room: Room, sessionId: string, seats?: GameViewSeat[]): GameView {
+  const hostSlotIndex = resolveHostSlotIndex(room);
+  const resolvedSeats = seats ?? buildSeats(room);
+  if (!room.game) {
+    return { view: null, seats: resolvedSeats, hostSlotIndex };
+  }
   const raw = getPlayerView(room.game, sessionId);
   // Drop the viewer's own sessionId from `you.id` — the client already holds
   // it, and stripping here keeps broadcast payloads (and any server-side logs
@@ -153,5 +164,5 @@ export function buildGameView(room: Room, sessionId: string, seats?: GameViewSea
     you: youRest,
     opponents: publicizeOpponents(room, raw.opponents),
   };
-  return { view, seats: seats ?? buildSeats(room), hostSlotIndex: null };
+  return { view, seats: resolvedSeats, hostSlotIndex };
 }

@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildGameView } from '../../src/game/view';
+import { buildGameView, buildSeats } from '../../src/game/view';
 import { makeRoom } from '../fixtures';
 import { initializeGameState } from '../../src/room/lifecycle';
 import { defaultPartnershipRules } from '@engine/types';
+import { RoomManager } from '../../src/room/manager';
 
 describe('buildGameView', () => {
   it('stamps seat presence for every slot', () => {
@@ -73,7 +74,7 @@ describe('buildGameView', () => {
       botControlled: false,
       isHost: false,
     });
-    expect(view.view.youSlotIndex).toBe(0);
+    expect(view.view!.youSlotIndex).toBe(0);
   });
 
   it('never leaks shuffle seed or raw sessionIds into the broadcast view', () => {
@@ -93,7 +94,7 @@ describe('buildGameView', () => {
     ]);
     room.game = initializeGameState(room);
 
-    const view = buildGameView(room, 'alice-session-secret').view;
+    const view = buildGameView(room, 'alice-session-secret').view!;
 
     expect(view.config).not.toHaveProperty('seed');
     for (const op of view.opponents) {
@@ -123,8 +124,8 @@ describe('buildGameView', () => {
     room.config.partnership = null;
     room.game = initializeGameState(room);
 
-    const aliceView = buildGameView(room, 'alice-secret').view;
-    const carolView = buildGameView(room, 'carol-secret').view;
+    const aliceView = buildGameView(room, 'alice-secret').view!;
+    const carolView = buildGameView(room, 'carol-secret').view!;
 
     for (const view of [aliceView, carolView]) {
       expect(view.config).not.toHaveProperty('seed');
@@ -168,5 +169,24 @@ describe('buildGameView', () => {
     ];
     room.game = initializeGameState(room);
     expect(() => buildGameView(room, 'ghost')).toThrow();
+  });
+});
+
+describe('buildGameView when room.game is null', () => {
+  it('returns view: null, populated seats, and hostSlotIndex', () => {
+    const mgr = new RoomManager();
+    const { room } = mgr.create({
+      sessionId: 'host-1',
+      playerName: 'Host',
+      config: { ruleset: 'recommended', stockPileSize: 10, handSize: 5, bidirectionalBuild: true, maxPlayers: 3, partnership: null },
+      allowAiFill: true,
+      visibility: 'public',
+    });
+    // room.phase is 'waiting'; room.game is null here.
+    const gv = buildGameView(room, 'host-1');
+    expect(gv.view).toBeNull();
+    expect(gv.seats).toHaveLength(3);
+    expect(gv.seats[0]).toMatchObject({ kind: 'human', name: 'Host', isHost: true });
+    expect(gv.hostSlotIndex).toBe(0);
   });
 });
