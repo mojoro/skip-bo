@@ -18,6 +18,26 @@ export function shouldReconnect(code: number): boolean {
   return !TERMINAL_CLOSE_CODES.has(code);
 }
 
+export function applyServerMessageToRematch(
+  prev: string | null,
+  msg: ServerMessage,
+): string | null {
+  if (msg.type === 'rematchReady') return msg.newRoomId;
+  return prev;
+}
+
+export function clearRematchOnIdentityChange(args: {
+  prevRoomId: string;
+  prevSessionId: string;
+  nextRoomId: string;
+  nextSessionId: string;
+  rematch: string | null;
+}): string | null {
+  if (args.prevRoomId !== args.nextRoomId) return null;
+  if (args.prevSessionId !== args.nextSessionId) return null;
+  return args.rematch;
+}
+
 export type GameSocketStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
 
 export interface GameSocket {
@@ -33,6 +53,8 @@ export interface GameSocket {
   lastActionError: { reason: string } | null;
   sendAction: (action: GameAction) => void;
   sendChat: (text: string) => void;
+  requestRematch: () => void;
+  rematchRoomId: string | null;
   chat: ChatEntry[];
 }
 
@@ -46,6 +68,7 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
   const [lastError, setLastError] = useState<{ code: number; reason: string } | null>(null);
   const [lastActionError, setLastActionError] = useState<{ reason: string } | null>(null);
   const [chat, setChat] = useState<ChatEntry[]>([]);
+  const [rematchRoomId, setRematchRoomId] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const outboundRef = useRef<ClientMessage[]>([]);
@@ -91,6 +114,9 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
           break;
         case 'actionError':
           setLastActionError({ reason: msg.reason });
+          break;
+        case 'rematchReady':
+          setRematchRoomId((prev) => applyServerMessageToRematch(prev, msg));
           break;
         case 'chat':
           setChat((prev) => {
@@ -161,6 +187,22 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
 
   const sendAction = useCallback((action: GameAction) => { enqueue({ type: 'action', action }); }, [enqueue]);
   const sendChat = useCallback((text: string) => { enqueue({ type: 'chat', text }); }, [enqueue]);
+  const requestRematch = useCallback(() => { enqueue({ type: 'requestRematch' }); }, [enqueue]);
 
-  return { view, stateVersion, status, lastError, lastActionError, sendAction, sendChat, chat };
+  const prevIdentityRef = useRef<{ roomId: string; sessionId: string }>({ roomId, sessionId });
+  useEffect(() => {
+    const prev = prevIdentityRef.current;
+    setRematchRoomId((r) =>
+      clearRematchOnIdentityChange({
+        prevRoomId: prev.roomId,
+        prevSessionId: prev.sessionId,
+        nextRoomId: roomId,
+        nextSessionId: sessionId,
+        rematch: r,
+      }),
+    );
+    prevIdentityRef.current = { roomId, sessionId };
+  }, [roomId, sessionId]);
+
+  return { view, stateVersion, status, lastError, lastActionError, sendAction, sendChat, requestRematch, rematchRoomId, chat };
 }
