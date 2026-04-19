@@ -5,11 +5,16 @@ import type { RoomInfo } from '@/lib/net/protocol';
 export interface RoomCardProps {
   room: RoomInfo;
   onJoin: (roomId: string) => void;
+  // Propagated from RoomList — overrides the full-table check when the
+  // viewer is already seated in some other room.
+  disabledReason?: string | null;
 }
 
-export function RoomCard({ room, onJoin }: RoomCardProps) {
+export function RoomCard({ room, onJoin, disabledReason = null }: RoomCardProps) {
   const { humans, ai, open, capacity } = room.slotSummary;
-  const joinDisabled = open === 0 && !room.allowAiFill;
+  const full = open === 0 && !room.allowAiFill;
+  const joinDisabled = full || disabledReason !== null;
+  const tooltip = disabledReason ?? (full ? 'Room is full' : undefined);
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 flex items-center gap-4">
@@ -24,6 +29,7 @@ export function RoomCard({ room, onJoin }: RoomCardProps) {
         type="button"
         onClick={() => onJoin(room.id)}
         disabled={joinDisabled}
+        title={tooltip}
         className="bg-[var(--gold)] text-stone-900 font-semibold hover:brightness-110 px-3 py-1 rounded text-xs disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Join

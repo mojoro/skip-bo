@@ -55,11 +55,52 @@ beforeEach(() => {
 });
 
 describe('LandingPage integration', () => {
+  it('shows a resume banner and disables joins when the session is already seated', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith('/v1/me/room')) {
+        return new Response(JSON.stringify({ roomId: 'r-bound' }), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+    render(<LandingPage />);
+    await waitFor(() => expect(MockEventSource.last).not.toBeNull());
+    act(() => {
+      MockEventSource.last!.fire('snapshot', {
+        type: 'snapshot',
+        rooms: [{
+          id: 'r-other', code: null, displayName: 'Other', phase: 'waiting', hostName: 'X',
+          allowAiFill: false, visibility: 'public',
+          slotSummary: { humans: 1, ai: 0, open: 1, locked: 0, capacity: 2 },
+          config: { ruleset: 'recommended', stockPileSize: 10, handSize: 5, bidirectionalBuild: true, maxPlayers: 2, partnership: null },
+          createdAt: 0,
+        }],
+        stats: { gamesInProgress: 0, playersOnline: 1 },
+      });
+    });
+    // Resume CTA points at the bound room.
+    const resume = await screen.findByRole('link', { name: /resume/i });
+    expect(resume).toHaveAttribute('href', '/rooms/r-bound');
+    // Join on other rooms is disabled.
+    const joinBtn = screen.getAllByRole('button', { name: /^join$/i })[0]!;
+    expect(joinBtn).toBeDisabled();
+  });
+
   it('joins a room from the snapshot and navigates', async () => {
-    fetchMock.mockResolvedValue(new Response(
-      JSON.stringify({ slotIndex: 1, room: { id: 'r-abc' } }),
-      { status: 201, headers: { 'content-type': 'application/json' } },
-    ));
+    // Two fetches happen: first `GET /v1/me/room` from useMySessionRoom
+    // (resolves to unseated), then `POST /v1/rooms/:id/members` from the
+    // Join click.
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith('/v1/me/room')) {
+        return new Response(JSON.stringify({ roomId: null }), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ slotIndex: 1, room: { id: 'r-abc' } }), {
+        status: 201, headers: { 'content-type': 'application/json' },
+      });
+    });
     render(<LandingPage />);
     await waitFor(() => expect(MockEventSource.last).not.toBeNull());
     act(() => {
