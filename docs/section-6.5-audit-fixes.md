@@ -18,6 +18,8 @@ Single-pass audit of branch `feature/section-6.5-lobby`, implemented by a Sonnet
 | `76c733a` | Add useMySessionRoom hook with focus-driven refetch (UX round 2) |
 | `5082f67` | Surface resume-your-game banner and disable joins when seated (UX round 2) |
 | `50dfaab` | Add Leave game button to the in-play Board header (UX round 2) |
+| `d9f1fa6` | Count explicit AI slots toward startGame player minimum (UX round 3) |
+| `4b0f99a` | Treat finished rooms as unseated in GET v1 me room (UX round 3) |
 
 ## Findings
 
@@ -72,8 +74,8 @@ Section 3's A1/A2 ratchet (`server/src/game/view.ts:publicizeConfig`) already sa
 
 ## Verification
 
-- Server suite: 148/148 after round 2 (was 142 after round 1, 139 before fixes; +9 regression tests).
-- Root suite: 139/139 after round 2 (+1 for the seated-session resume/disable behavior).
+- Server suite: 151/151 after round 3 (was 148 after round 2, 142 after round 1, 139 before fixes; +12 regression tests).
+- Root suite: 141/141 after round 3 (+2 for AI-slot start and all-AI rejection; 139 after round 2).
 - Server typecheck: clean.
 - Root typecheck: still fails only on pre-existing follow-up #13 (`@engine/*` alias under `server/`), unchanged.
 - Not browser-verified: fixes are on wire-shape + server internals; existing Playwright walk-through from Task 26 still describes the UI end-to-end behavior.
@@ -113,6 +115,39 @@ The definition of "live human" deliberately excludes `botControlled === true` bu
 - `roomId === undefined` (fetch in flight) is distinct from `null` (confirmed unseated) so the lobby doesn't flicker the banner in during the initial fetch.
 
 **Files:** `server/src/http/handlers/rooms.ts`, `server/src/http/server.ts`, `server/tests/http/rooms.test.ts`, `src/lib/net/api.ts`, `src/lib/net/useMySessionRoom.ts`, `src/components/lobby/Lobby.tsx`, `src/components/lobby/RoomList.tsx`, `src/components/lobby/RoomCard.tsx`, `src/app/page.integration.test.tsx`.
+
+## Round 3 findings — AI-slot preconditions & post-finish lobby state
+
+Two more user-reported issues after round 2 shipped.
+
+### C5 (Bug — blocked flow). Host toggling a slot to AI couldn't start the game
+
+**Bug.** `RoomManager.startGame` and the client's `canStart` both gated on `humans >= 2` (with an `allowAiFill && humans + open >= 2` escape hatch). Neither counted **explicit** AI slots produced by `setSlot({ kind: 'ai' })`. So a solo host at a 4-seat table who toggled two seats to AI and locked the fourth still saw `tooFew` — even though every position was accounted for and `initializeGameState` would happily seat three players (one human, two AI).
+
+**Fix.** Rewrote the precondition on both sides to match the engine's actual requirements:
+
+- At least one human must be seated (an all-AI room has no owner to keep it alive).
+- Playable seat count ≥ 2 where `playable = humans + explicit AI + (open slots only if allowAiFill)`.
+- Remaining open slots when `allowAiFill === false` still block the start.
+
+Client `StartButton.canStart` mirrors the server rule and its tooltip now distinguishes the three failure modes (no human, open slots + no fill, under two playable). Added regression test: solo host + one AI + two locked slots now returns `true`.
+
+**Files:** `server/src/room/manager.ts`, `server/tests/room/lifecycle.test.ts`, `src/components/room/StartButton.tsx`, `src/components/room/StartButton.test.tsx`.
+
+### C6 (Critical — UX). Finished game blocked the session from creating a new room
+
+**Bug.** Section 6's fix kept sessionIndex entries alive through the post-finish 5-minute cleanup so rematch requests could come over the still-open socket. The Round-2 "resume banner" then read sessionIndex and flagged the session as seated in a finished room. Combined effect: user clicks "Back to lobby" after a game ends → lobby disables Create + Join (because `sessionAlreadySeated`) but doesn't show the resume banner either, because… well, Round 2 *did* show the banner, pointing at the finished room — but C6 makes it worse: POST create still rejects with `409 sessionAlreadySeated` from the server-side `sessionIndex.has(...)` guard in `RoomManager.create`. Until the 5-minute cleanup timer fired, the session was lobby-locked with no recourse.
+
+**Fix.** Two matching changes:
+
+- `GET /v1/me/room` now checks the referenced room's phase; finished rooms report `{ roomId: null }`, so the lobby treats the session as free. Direct URL reconnects still work for any user who wants to hit the WinModal's rematch CTA.
+- Server-side `RoomManager.create` and `addMember` now call `isSessionSeatedElsewhere(sessionId)` instead of `sessionIndex.has(...)`. The helper opportunistically drops stale pointers to finished or already-deleted rooms and returns `true` only when the mapped room is still `waiting` or `playing`. Net effect: once your game finishes, you're free to create or join another room immediately.
+
+New regression tests:
+- `server/tests/http/rooms.test.ts` — `GET /v1/me/room` reports null for a finished room even when sessionIndex still points there.
+- `server/tests/room/lifecycle.test.ts` — session freed from a finished room can create a new one.
+
+**Files:** `server/src/http/handlers/rooms.ts`, `server/src/room/manager.ts`, `server/tests/http/rooms.test.ts`, `server/tests/room/lifecycle.test.ts`.
 
 ## Minor findings noted but not fixed
 
