@@ -21,6 +21,22 @@ curl -sL "https://github.com/docker/compose/releases/latest/download/docker-comp
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
+# 2.5. Docker buildx plugin — AL2023's bundled buildx is too old for the
+#      current compose plugin; compose build otherwise errors with:
+#        "compose build requires buildx 0.17.0 or later"
+#      Buildx releases name binaries with arm64/amd64 (not aarch64/x86_64),
+#      so translate uname before fetching.
+BUILDX_VERSION=$(curl -s https://api.github.com/repos/docker/buildx/releases/latest \
+  | grep '"tag_name"' | cut -d '"' -f 4)
+case "$(uname -m)" in
+  aarch64) BUILDX_ARCH=arm64 ;;
+  x86_64)  BUILDX_ARCH=amd64 ;;
+  *) echo "Unsupported arch: $(uname -m)"; exit 1 ;;
+esac
+curl -sL "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-${BUILDX_ARCH}" \
+  -o /usr/local/lib/docker/cli-plugins/docker-buildx
+chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+
 # 3. Enable Docker; add ec2-user to docker group so deploys don't need sudo.
 systemctl enable --now docker
 usermod -aG docker ec2-user
