@@ -3,13 +3,13 @@
 import Card from '@/components/Card';
 import DroppableZone from '@/components/DroppableZone';
 import WildDirectionPicker from '@/components/WildDirectionPicker';
-import { BuildPile, GameConfig } from '@/lib/game/types';
+import { BuildPile } from '@/lib/game/types';
 
 interface TableCenterProps {
   buildPiles: BuildPile[];
   drawPileCount: number;
   completedPileCount: number;
-  config: GameConfig;
+  config: { bidirectionalBuild: boolean };
   onClickBuildPile: (index: number) => void;
   pendingWildBuildPileIndex?: number | null;
   onPickWildDirection?: (direction: 'asc' | 'desc') => void;

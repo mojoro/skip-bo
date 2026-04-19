@@ -15,7 +15,7 @@ export interface MobileBoardViewProps {
   buildPiles: GameState['buildPiles'];
   drawPileCount: number;
   completedPileCount: number;
-  config: GameState['config'];
+  config: { bidirectionalBuild: boolean };
   selection: SeatSelection;
   onSelectHand: (idx: number) => void;
   onSelectStock: () => void;
