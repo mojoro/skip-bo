@@ -6,11 +6,11 @@ Repo: https://github.com/mojoro/skip-bo
 
 ## 🔖 Where we left off
 
-Section 6.5 (lobby + AoE2-style pre-game room) shipped on `feature/section-6.5-lobby`. Landing page is now the lobby (SSE-backed public rooms list, create/join forms, display-name gate). `/rooms/[roomId]` phase-branches between `<PreGameRoom>` (waiting) and `<Board>` (playing). Game WS handshake now accepts waiting-phase connections so one socket covers both views — `broadcastRoomState` fans out a state frame to every connected waiting-phase socket whenever a REST mutation fires (join/leave/slot-change/config-patch/start).
+Sections 6 (shared Board + rematch) and 6.5 (lobby + AoE2-style pre-game room + LAN play) both shipped and survived nine audit rounds. Landing page is the lobby (SSE-backed public rooms list, create form with visibility + AI-fill toggles, join-by-code, display-name gate, resume-your-game banner, live players-online count including lobby viewers). `/rooms/[roomId]` phase-branches between `<PreGameRoom>` (slot editing + config editing + chat + copy-able join code) and `<Board>` (playing, with Leave-game action + WinModal rematch). Game WS handshake accepts waiting-phase connections so one socket covers both views — `broadcastRoomState` + `driveRoomAfterStateChange` fan out on every REST mutation and drive bot turns even when a bot seats first. See `docs/section-6-audit-fixes.md` and `docs/section-6.5-audit-fixes.md` for the full audit trail.
 
-**Next up — Section 5 (AI bots).** Random-legal stub at `server/src/game/bot.ts`. Replace with rule-based / heuristic strategy. Same `applyAction` contract. Section 7 (AWS deploy) after that.
+**Next up — Section 5 (AI bots).** Random-legal stub at `server/src/game/bot.ts`. Replace with rule-based / heuristic strategy. Same `applyAction` contract. Section 7 (AWS deploy) after that; HTTPS on the LAN host would unlock `crypto.randomUUID` + `navigator.clipboard` native paths.
 
-**Running it locally:** `npm --prefix server run build` then `npm --prefix server start` (tsx watch broken per #14). Next dev needs `.env.local` at repo root with both `NEXT_PUBLIC_GAME_WS_URL=ws://localhost:8787` and `NEXT_PUBLIC_GAME_API_URL=http://localhost:8787`.
+**Running it locally:** `npm --prefix server run build` then `npm --prefix server start` (tsx watch broken per #14). `npm run dev` at the root starts Next. LAN peers can connect at `http://<host-ip>:3000` without config — `src/lib/net/endpoints.ts` resolves the game server from the page's hostname. Set `NEXT_PUBLIC_GAME_{WS,API}_URL` explicitly only for prod deploys.
 
 **Follow-ups:**
 - #4. `patchRoomSchema` allows partial `config` merges that silently resize below seated count — drop `config` from PATCH or add config-aware handler.
@@ -29,7 +29,7 @@ Section 6.5 (lobby + AoE2-style pre-game room) shipped on `feature/section-6.5-l
 
 **Audit 3+4 closed these prior follow-ups:** #1 (setSlot displacement) via audit-3 #H, #2/#3 (finishGame cleanup) in Section 3 Task 2, #5 (`connected: false` semantics) resolved — means "not WS-attached".
 
-**State:** server suite 139/139, main-app suite 138/138, server typecheck clean. Root `npx tsc --noEmit` still fails only on follow-up #13 (`@engine/*` alias).
+**State:** server suite 153/153, main-app suite 142/142, server typecheck clean. Root `npx tsc --noEmit` still fails only on follow-up #13 (`@engine/*` alias). Some UI polish bugs remain but nothing structural.
 
 ## Status snapshot
 
