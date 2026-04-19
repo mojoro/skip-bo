@@ -59,7 +59,7 @@ export function engineStateToView(state: GameState, youPlayerIndex: number): Gam
     isHost: i === youPlayerIndex,
   }));
 
-  return { view, seats, hostSlotIndex: null };
+  return { view, seats, hostSlotIndex: null, config: view.config, allowAiFill: false, youSlotIndex: youPlayerIndex };
 }
 
 function publicizeConfig(config: GameConfig, players: GameState['players']): PublicGameConfig {

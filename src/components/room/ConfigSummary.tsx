@@ -1,9 +1,9 @@
 'use client';
 
-import type { GameConfig } from '@/lib/game/types';
+import type { PublicGameConfig } from '@/lib/net/protocol';
 
 export interface ConfigSummaryProps {
-  config: GameConfig;
+  config: PublicGameConfig;
   isHost: boolean;
   onEdit: () => void;
 }

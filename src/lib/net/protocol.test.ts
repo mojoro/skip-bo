@@ -14,12 +14,24 @@ describe('protocol shapes', () => {
   });
 });
 
+const minimalConfig = {
+  ruleset: 'recommended' as const,
+  stockPileSize: 10,
+  handSize: 5,
+  bidirectionalBuild: false,
+  maxPlayers: 2,
+  partnership: null,
+};
+
 describe('PlayerView null view', () => {
   it('accepts view: null for waiting phase', () => {
     const view: GameView = {
       view: null,
       seats: [],
       hostSlotIndex: null,
+      config: minimalConfig,
+      allowAiFill: false,
+      youSlotIndex: 0,
     };
     expect(view.view).toBeNull();
   });
@@ -29,6 +41,9 @@ describe('PlayerView null view', () => {
       view: null,
       seats: [],
       hostSlotIndex: 0,
+      config: minimalConfig,
+      allowAiFill: false,
+      youSlotIndex: 0,
     };
     expect(view.hostSlotIndex).toBe(0);
     expect(view.view).toBe(null);

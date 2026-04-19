@@ -9,7 +9,7 @@ import { ConfigSummary } from './ConfigSummary';
 import { ChatPanel } from './ChatPanel';
 import { StartButton } from './StartButton';
 import { leaveRoom, patchRoom, setSlot, startGame, ApiError } from '@/lib/net/api';
-import type { GameViewSeat, ChatEntry } from '@/lib/net/protocol';
+import type { GameViewSeat, ChatEntry, PublicGameConfig } from '@/lib/net/protocol';
 import type { GameConfig } from '@/lib/game/types';
 
 export interface PreGameRoomProps {
@@ -17,7 +17,7 @@ export interface PreGameRoomProps {
   sessionId: string;
   roomId: string;
   seats: GameViewSeat[];
-  config: GameConfig;
+  config: PublicGameConfig;
   hostSlotIndex: number | null;
   youSlotIndex: number;
   chat: ChatEntry[];

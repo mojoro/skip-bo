@@ -62,6 +62,9 @@ export interface GameView {
   view: PlayerView | null;
   seats: GameViewSeat[];
   hostSlotIndex: number | null;
+  config: PublicGameConfig;
+  allowAiFill: boolean;
+  youSlotIndex: number;
 }
 
 export type ClientMessage =

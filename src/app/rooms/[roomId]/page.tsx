@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, use, type ReactNode, useCallback } from '
 import { useRouter } from 'next/navigation';
 import { useGameSocket } from '@/lib/net/useGameSocket';
 import Board from '@/components/Board';
+import { PreGameRoom } from '@/components/room/PreGameRoom';
 import type { WinModalAction } from '@/components/WinModal';
 
 function useSessionId(): string | null {
@@ -100,13 +101,22 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
 
   const { view, seats } = socket.view;
 
-  // view is null when the room is still in waiting phase (no game started yet).
-  // Task 22 will replace this placeholder with the PreGameRoom component.
+  const baseUrl = process.env.NEXT_PUBLIC_GAME_API_URL ?? 'http://localhost:8787';
+
   if (!view) {
     return (
-      <Frame>
-        <Placeholder>Waiting for the game to start…</Placeholder>
-      </Frame>
+      <PreGameRoom
+        baseUrl={baseUrl}
+        sessionId={sessionId ?? ''}
+        roomId={roomId}
+        seats={socket.view.seats}
+        config={socket.view.config}
+        hostSlotIndex={socket.view.hostSlotIndex}
+        youSlotIndex={socket.view.youSlotIndex}
+        chat={socket.chat}
+        onSendChat={socket.sendChat}
+        allowAiFill={socket.view.allowAiFill}
+      />
     );
   }
 

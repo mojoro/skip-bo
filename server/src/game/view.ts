@@ -53,6 +53,9 @@ export interface GameView {
   view: PublicPlayerView | null;
   seats: GameViewSeat[];
   hostSlotIndex: number | null;
+  config: PublicGameConfig;
+  allowAiFill: boolean;
+  youSlotIndex: number;
 }
 
 function publicizeConfig(room: Room, config: GameConfig): PublicGameConfig {
@@ -135,11 +138,23 @@ function resolveHostSlotIndex(room: Room): number | null {
   return idx >= 0 ? idx : null;
 }
 
+function resolveYouSlotIndex(room: Room, sessionId: string): number {
+  return room.slots.findIndex((s) => s.kind === 'human' && s.sessionId === sessionId);
+}
+
 export function buildGameView(room: Room, sessionId: string, seats?: GameViewSeat[]): GameView {
   const hostSlotIndex = resolveHostSlotIndex(room);
   const resolvedSeats = seats ?? buildSeats(room);
+  const publicConfig = publicizeConfig(room, room.config);
   if (!room.game) {
-    return { view: null, seats: resolvedSeats, hostSlotIndex };
+    return {
+      view: null,
+      seats: resolvedSeats,
+      hostSlotIndex,
+      config: publicConfig,
+      allowAiFill: room.allowAiFill,
+      youSlotIndex: resolveYouSlotIndex(room, sessionId),
+    };
   }
   const raw = getPlayerView(room.game, sessionId);
   // Drop the viewer's own sessionId from `you.id` — the client already holds
@@ -164,5 +179,5 @@ export function buildGameView(room: Room, sessionId: string, seats?: GameViewSea
     you: youRest,
     opponents: publicizeOpponents(room, raw.opponents),
   };
-  return { view, seats: resolvedSeats, hostSlotIndex };
+  return { view, seats: resolvedSeats, hostSlotIndex, config: publicConfig, allowAiFill: room.allowAiFill, youSlotIndex };
 }
