@@ -1,5 +1,18 @@
 import type { GameAction, GameConfig, GameState, PartnershipRules, PlayerState, CardValue } from '@/lib/game/types';
 
+export interface RoomInfo {
+  id: string;
+  code: string | null;
+  displayName: string;
+  phase: 'waiting' | 'playing' | 'finished';
+  config: import('@/lib/game/types').GameConfig;
+  allowAiFill: boolean;
+  visibility: 'public' | 'private';
+  slotSummary: { humans: number; ai: number; open: number; locked: number; capacity: number };
+  hostName: string;
+  createdAt: number;
+}
+
 export interface OpponentView {
   slotIndex: number;
   name: string;
