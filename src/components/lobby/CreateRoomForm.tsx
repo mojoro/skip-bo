@@ -25,7 +25,7 @@ export function CreateRoomForm({ baseUrl, sessionId, playerName, onCreated }: Cr
     setError(null);
     try {
       const partnership = settings.partnershipEnabled
-        ? { enabled: true, allowInterTeamPlay: true, allowInterTeamDiscard: false, allowInterTeamStock: false, teams: [] as string[][] }
+        ? { enabled: true, allowPlayFromPartnerStock: true, allowPlayFromPartnerDiscard: true, allowDiscardToPartnerDiscard: settings.partnershipAllowDiscardToPartner, teams: [] as string[][] }
         : null;
       const config: GameConfig = {
         ruleset: settings.ruleset,
