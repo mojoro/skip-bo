@@ -12,6 +12,11 @@ export default function GameChatDock({ chat, onSend }: GameChatDockProps) {
   const [open, setOpen] = useState(false);
   const [lastSeen, setLastSeen] = useState(chat.length);
   const [draft, setDraft] = useState('');
+  // Extra bottom offset to keep the dock above the virtual keyboard on
+  // browsers that don't honor viewport `interactiveWidget: resizes-content`
+  // (older iOS Safari). Chrome/Android and iOS 17.4+ shrink the layout
+  // viewport themselves and this stays at 0.
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const listRef = useRef<HTMLOListElement | null>(null);
 
   // Keep the read marker pinned to the tail while the panel is open so
@@ -27,6 +32,26 @@ export default function GameChatDock({ chat, onSend }: GameChatDockProps) {
     if (!node) return;
     node.scrollTop = node.scrollHeight;
   }, [chat.length, open]);
+
+  // Track the visual viewport so the dock floats above the virtual keyboard
+  // even when the browser doesn't resize the layout viewport.
+  useEffect(() => {
+    if (!open) { setKeyboardOffset(0); return; }
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    const vv = window.visualViewport;
+    const measure = () => {
+      const layoutHeight = window.innerHeight;
+      const hidden = Math.max(0, layoutHeight - vv.height - vv.offsetTop);
+      setKeyboardOffset(hidden);
+    };
+    measure();
+    vv.addEventListener('resize', measure);
+    vv.addEventListener('scroll', measure);
+    return () => {
+      vv.removeEventListener('resize', measure);
+      vv.removeEventListener('scroll', measure);
+    };
+  }, [open]);
 
   const unread = Math.max(0, chat.length - lastSeen);
 
@@ -44,7 +69,11 @@ export default function GameChatDock({ chat, onSend }: GameChatDockProps) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label={unread > 0 ? `Open chat (${unread} new)` : 'Open chat'}
-        className="absolute bottom-3 left-3 z-30 w-11 h-11 rounded-full bg-black/55 hover:bg-black/75 border border-white/15 text-white flex items-center justify-center shadow-lg backdrop-blur-sm"
+        className="fixed z-40 w-11 h-11 rounded-full bg-black/55 hover:bg-black/75 border border-white/15 text-white flex items-center justify-center shadow-lg backdrop-blur-sm"
+        style={{
+          bottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+          left: 'max(0.75rem, env(safe-area-inset-left))',
+        }}
       >
         <svg
           aria-hidden
@@ -69,7 +98,13 @@ export default function GameChatDock({ chat, onSend }: GameChatDockProps) {
   }
 
   return (
-    <div className="absolute bottom-3 left-3 z-30 w-80 max-w-[92vw] rounded-xl overflow-hidden border border-white/15 bg-black/55 backdrop-blur-sm shadow-2xl flex flex-col">
+    <div
+      className="fixed z-40 w-80 max-w-[92vw] rounded-xl overflow-hidden border border-white/15 bg-black/55 backdrop-blur-sm shadow-2xl flex flex-col"
+      style={{
+        bottom: `calc(max(0.75rem, env(safe-area-inset-bottom)) + ${keyboardOffset}px)`,
+        left: 'max(0.75rem, env(safe-area-inset-left))',
+      }}
+    >
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
         <span className="text-xs font-semibold text-white/85 tracking-wider uppercase">
           Chat
@@ -105,6 +140,9 @@ export default function GameChatDock({ chat, onSend }: GameChatDockProps) {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           maxLength={200}
+          enterKeyHint="send"
+          autoComplete="off"
+          autoCorrect="off"
           className="flex-1 bg-black/40 border border-white/15 rounded px-2 py-1 text-xs text-white"
         />
         <button
