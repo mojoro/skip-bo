@@ -203,15 +203,17 @@ describe('game ws full flow', () => {
     broadcastRoomState(roomRef, h.gameRegistry);
     driveRoomAfterStateChange(roomRef, h.gameRegistry, h.mgr);
 
-    // Bot moves within BOT_MOVE_DELAY_MS (800ms default). After the move the
-    // current player advances off slot 1.
+    // Bot moves within BOT_MOVE_DELAY_MS (800 ms default). After the move
+    // the current player advances off slot 1. Timeout is generous to
+    // tolerate vitest running this file in parallel with the grace-expiry
+    // real-timer test — both share the process event loop.
     const botMove = await nextJson(
       host.ws,
       (m) =>
         m.type === 'state'
         && m.stateVersion > initialVersion + 1
         && m.view.view.currentPlayerSlotIndex !== 1,
-      2500,
+      5000,
     );
     expect(botMove.stateVersion).toBeGreaterThan(initialVersion + 1);
     host.ws.close();
