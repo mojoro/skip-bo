@@ -144,12 +144,24 @@ describe('RoomManager join/leave/slots', () => {
     expect(host.slots[1]!.kind).toBe('open');
   });
 
-  it('removeMember is rejected with a phase error during playing', () => {
+  it('removeMember rejects host kicks during playing but allows self-leave', () => {
     mgr.addMember(host.id, { sessionId: 's2', playerName: 'P2' });
     mgr.startGame(host.id, { actorSessionId: 'host' });
+    // Host cannot kick another player mid-game — would orphan the engine slot.
     expect(() =>
-      mgr.removeMember(host.id, 's2', { actorSessionId: 's2' }),
+      mgr.removeMember(host.id, 's2', { actorSessionId: 'host' }),
     ).toThrow(/in progress/);
+    // But s2 is free to leave themselves; the seat flips to bot-controlled
+    // and the sessionIndex is freed so they can join elsewhere.
+    mgr.removeMember(host.id, 's2', { actorSessionId: 's2' });
+    const room = mgr.get(host.id)!;
+    const slot = room.slots[1]!;
+    expect(slot.kind).toBe('human');
+    if (slot.kind === 'human') {
+      expect(slot.botControlled).toBe(true);
+      expect(slot.sessionId).toBe('s2');
+    }
+    expect(mgr.sessionRoomId('s2')).toBeUndefined();
   });
 
   it('setSlot from host to ai swaps cleanly during waiting', () => {

@@ -84,6 +84,42 @@ describe('lifecycle', () => {
     expect(room.game!.config.partnership?.teams).toEqual([['h', 'b'], ['a', 'c']]);
   });
 
+  it('self-leave during playing flips the seat to botControlled and frees the session', () => {
+    const { room } = mgr.create({ sessionId: 'h', playerName: 'H', config: baseConfig(), allowAiFill: true, visibility: 'public' });
+    mgr.addMember(room.id, { sessionId: 'a', playerName: 'A' });
+    mgr.startGame(room.id, { actorSessionId: 'h' });
+    expect(room.phase).toBe('playing');
+    mgr.removeMember(room.id, 'h', { actorSessionId: 'h' });
+    const hostSlot = room.slots[0];
+    expect(hostSlot?.kind).toBe('human');
+    if (hostSlot?.kind === 'human') {
+      expect(hostSlot.botControlled).toBe(true);
+      expect(hostSlot.sessionId).toBe('h');
+    }
+    // Session is free to join another room.
+    expect(mgr.sessionRoomId('h')).toBeUndefined();
+  });
+
+  it('host cannot kick another member during play', () => {
+    const { room } = mgr.create({ sessionId: 'h', playerName: 'H', config: baseConfig(), allowAiFill: true, visibility: 'public' });
+    mgr.addMember(room.id, { sessionId: 'a', playerName: 'A' });
+    mgr.startGame(room.id, { actorSessionId: 'h' });
+    expect(() => mgr.removeMember(room.id, 'a', { actorSessionId: 'h' })).toThrow(/in progress/);
+  });
+
+  it('last live human leaving an in-progress game ends it as abandoned', () => {
+    const { room } = mgr.create({ sessionId: 'h', playerName: 'H', config: baseConfig(), allowAiFill: true, visibility: 'public' });
+    mgr.addMember(room.id, { sessionId: 'a', playerName: 'A' });
+    mgr.startGame(room.id, { actorSessionId: 'h' });
+    mgr.removeMember(room.id, 'h', { actorSessionId: 'h' });
+    expect(room.phase).toBe('playing');
+    mgr.removeMember(room.id, 'a', { actorSessionId: 'a' });
+    expect(room.phase).toBe('finished');
+    // Neither session is still bound to the (now-finishing) room.
+    expect(mgr.sessionRoomId('h')).toBeUndefined();
+    expect(mgr.sessionRoomId('a')).toBeUndefined();
+  });
+
   it('finish cleans up after 5 minutes', () => {
     const { room } = mgr.create({ sessionId: 'h', playerName: 'H', config: baseConfig(), allowAiFill: true, visibility: 'public' });
     mgr.addMember(room.id, { sessionId: 'a', playerName: 'A' });

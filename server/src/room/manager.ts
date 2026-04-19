@@ -176,22 +176,51 @@ export class RoomManager {
     opts: { actorSessionId: string },
   ): void {
     const room = this.requireRoom(roomId);
-    // Mid-game removal would leave the engine player entry orphaned — dispatch
-    // would then refuse every action from that seat while no bot steps in,
-    // stalling the turn forever. To quit mid-game, clients must disconnect;
-    // the grace timer then hands the seat to a bot.
-    if (room.phase === 'playing') {
-      throw new RoomError('phase', 'Members cannot be removed while the game is in progress.');
-    }
     const selfLeave = opts.actorSessionId === targetSessionId;
     const isHost = opts.actorSessionId === room.hostSessionId;
     if (!selfLeave && !isHost) {
       throw new RoomError('forbidden', 'Only the target or the host may remove a member.');
     }
+    // Host can't kick mid-game (would orphan the engine player entry and
+    // stall turns); self-leave during play flips the seat to bot-controlled
+    // and frees the sessionIndex so the leaver can create or join another
+    // room immediately, without waiting out the 60 s grace window.
+    if (room.phase === 'playing' && !selfLeave) {
+      throw new RoomError('phase', 'Members cannot be removed while the game is in progress.');
+    }
     const idx = room.slots.findIndex(
       (s) => s.kind === 'human' && s.sessionId === targetSessionId,
     );
     if (idx < 0) return;
+
+    if (room.phase === 'playing') {
+      // Mid-game self-leave: bot takeover so the engine keeps a valid player
+      // entry at this slot. Grace timer is cancelled — the leave is
+      // deliberate, not a transient disconnect.
+      const current = room.slots[idx];
+      if (current && current.kind === 'human') {
+        if (current.graceTimer) {
+          clearTimeout(current.graceTimer);
+          current.graceTimer = null;
+          current.graceDeadline = null;
+        }
+        current.connected = false;
+        current.botControlled = true;
+      }
+      this.sessionIndex.delete(targetSessionId);
+      if (targetSessionId === room.hostSessionId) {
+        this.migrateHostAwayFromBot(room);
+      }
+      // If no live humans remain, end the game — otherwise bots would play
+      // each other to completion in an empty room.
+      if (this.tryEndAbandonedGame(room)) return;
+      this.touch(room);
+      this.emitRoomUpdated(room);
+      this.emitStateChange(room);
+      return;
+    }
+
+    // Waiting phase: open the slot.
     room.slots[idx] = { kind: 'open' };
     this.sessionIndex.delete(targetSessionId);
     if (!selfLeave) {
@@ -280,6 +309,21 @@ export class RoomManager {
     this.clearIdleTimer(room);
     this.emitRoomRemoved(room);
     this.emitStateChange(room);
+  }
+
+  // Ends a playing game when no live human remains. "Live" = seated + not
+  // bot-controlled; a disconnected-but-inside-grace session still counts so
+  // transient flaps don't abandon the game. Returns true when the game ended.
+  // Public so the game layer can call it from grace-expiry (the other path
+  // where a seat flips to bot-controlled).
+  tryEndAbandonedGame(room: Room): boolean {
+    if (room.phase !== 'playing') return false;
+    const liveHuman = room.slots.some(
+      (s) => s.kind === 'human' && !s.botControlled,
+    );
+    if (liveHuman) return false;
+    this.finishGame(room.id, 'abandoned');
+    return true;
   }
 
   finishGame(roomId: string, reason: FinishReason): void {
