@@ -112,6 +112,8 @@ function buildHeadline(
   if (endedReason === 'abandoned') {
     return { title: 'Game abandoned', subtitle: 'The remaining players have left the game.' };
   }
+  // winningTeamIndex should be non-null when endedReason === 'winner';
+  // fall through to 'Game over' if the server sends an inconsistent state.
   if (winningTeamIndex === null) {
     return { title: 'Game over', subtitle: null };
   }
