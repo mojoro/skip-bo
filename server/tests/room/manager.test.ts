@@ -311,6 +311,7 @@ describe('RoomManager.createRematchRoom', () => {
   it('generates a fresh seed so the cloned config does not replay the original shuffle', () => {
     const { mgr, room } = makePlayingRoom();
     mgr.finishGame(room.id, 'winner');
+    room.config.seed = 42; // ensure guard always runs
     const seatedHumans = room.slots
       .map((slot, i) => ({ slot, i }))
       .filter((x) => x.slot.kind === 'human')
@@ -320,9 +321,7 @@ describe('RoomManager.createRematchRoom', () => {
         slotIndex: x.i,
       }));
     const { room: next } = mgr.createRematchRoom({ sourceRoom: room, seatedHumans });
-    if (room.config.seed !== undefined && next.config.seed !== undefined) {
-      expect(next.config.seed).not.toBe(room.config.seed);
-    }
+    expect(next.config.seed).not.toBe(room.config.seed);
   });
 
   it('does not delete reassigned sessionIndex entries when source room cleanup fires', () => {

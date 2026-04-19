@@ -356,7 +356,6 @@ export class RoomManager {
         room: projectRoomInfo(room, { context: 'list' }),
       });
     }
-    this.scheduleIdle(room);
     return { room };
   }
 
