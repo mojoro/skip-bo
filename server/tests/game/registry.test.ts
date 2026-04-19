@@ -55,3 +55,41 @@ describe('GameRegistry', () => {
     expect(b.closes).toEqual([{ code: 1001, reason: 'shutdown' }]);
   });
 });
+
+describe('GameRegistry rematch map', () => {
+  it('starts with no rematch mapping for any room', () => {
+    const reg = new GameRegistry();
+    expect(reg.getRematchRoomId('src-1')).toBeNull();
+  });
+
+  it('persists a set rematch id and returns it on getRematchRoomId', () => {
+    const reg = new GameRegistry();
+    reg.setRematchRoomId('src-1', 'new-1');
+    expect(reg.getRematchRoomId('src-1')).toBe('new-1');
+  });
+
+  it('tracks multiple sources independently', () => {
+    const reg = new GameRegistry();
+    reg.setRematchRoomId('src-1', 'new-1');
+    reg.setRematchRoomId('src-2', 'new-2');
+    expect(reg.getRematchRoomId('src-1')).toBe('new-1');
+    expect(reg.getRematchRoomId('src-2')).toBe('new-2');
+  });
+
+  it('overwrites on re-set (last write wins, though callers should not normally do this)', () => {
+    const reg = new GameRegistry();
+    reg.setRematchRoomId('src-1', 'new-1');
+    reg.setRematchRoomId('src-1', 'new-2');
+    expect(reg.getRematchRoomId('src-1')).toBe('new-2');
+  });
+
+  it('survives removing all connections in the source room', () => {
+    const reg = new GameRegistry();
+    const conn = { sessionId: 's1', send: () => {}, close: () => {} };
+    reg.add('src-1', conn);
+    reg.setRematchRoomId('src-1', 'new-1');
+    reg.remove('src-1', conn);
+    expect(reg.size('src-1')).toBe(0);
+    expect(reg.getRematchRoomId('src-1')).toBe('new-1');
+  });
+});

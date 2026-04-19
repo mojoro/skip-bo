@@ -6,6 +6,7 @@ export interface RegisteredConnection {
 
 export class GameRegistry {
   private readonly rooms = new Map<string, Set<RegisteredConnection>>();
+  private readonly rematchBySourceRoom = new Map<string, string>();
 
   add(roomId: string, conn: RegisteredConnection): void {
     let set = this.rooms.get(roomId);
@@ -58,5 +59,13 @@ export class GameRegistry {
     const out: RegisteredConnection[] = [];
     for (const set of this.rooms.values()) for (const c of set) out.push(c);
     return out;
+  }
+
+  getRematchRoomId(sourceRoomId: string): string | null {
+    return this.rematchBySourceRoom.get(sourceRoomId) ?? null;
+  }
+
+  setRematchRoomId(sourceRoomId: string, newRoomId: string): void {
+    this.rematchBySourceRoom.set(sourceRoomId, newRoomId);
   }
 }
