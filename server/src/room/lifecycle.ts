@@ -83,7 +83,7 @@ function resolvePartnership(
   const flat = stored.teams.flat();
   const teamsValid =
     stored.teams.length >= 2
-    && stored.teams.every((team) => team.length > 0 && team.every((id) => idSet.has(id)))
+    && stored.teams.every((team: string[]) => team.length > 0 && team.every((id: string) => idSet.has(id)))
     && flat.length === playerIds.length
     && new Set(flat).size === flat.length;
   if (teamsValid) return stored;

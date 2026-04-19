@@ -271,6 +271,12 @@ export class GameConnection implements RegisteredConnection {
           this.log.info({ sessionId: this.sessionId }, 'graceExpire');
           const newHost = this.manager.migrateHostAwayFromBot(this.room);
           if (newHost) this.log.info({ newHost, from: this.sessionId }, 'hostMigrated');
+          // No live human left — end the game as abandoned rather than let
+          // bots play each other to completion in an empty room.
+          if (this.manager.tryEndAbandonedGame(this.room)) {
+            this.log.info({ roomId: this.room.id }, 'gameAbandoned');
+            return;
+          }
           this.broadcastState();
           maybeRunBotTurn(this.room, {
             onAfterMove: () => { this.broadcastState(); this.onAfterCommit(); },

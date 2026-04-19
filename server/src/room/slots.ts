@@ -13,7 +13,7 @@ export function publicizeRoomConfig(room: Room): PublicRoomConfig {
     ...rest,
     partnership: {
       ...partnership,
-      teams: partnership.teams.map((team) => team.map((id) => slotIndexForPlayerId(room, id))),
+      teams: partnership.teams.map((team: string[]) => team.map((id: string) => slotIndexForPlayerId(room, id))),
     },
   };
 }
