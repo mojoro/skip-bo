@@ -11,7 +11,12 @@ const gameConfigSchema = z.object({
   partnership: z
     .object({
       enabled: z.boolean(),
-      teams: z.array(z.array(z.string())).min(2),
+      // Teams are auto-built at `startGame` from the current slot order —
+      // see `src/room/lifecycle.ts:buildAutoPartnershipTeams`. Clients may
+      // submit an empty array (they do not know every player's sessionId
+      // at create time) or a pre-filled array; either way the server
+      // rebuilds teams from slots before the engine sees them.
+      teams: z.array(z.array(z.string())),
       allowPlayFromPartnerStock: z.boolean(),
       allowPlayFromPartnerDiscard: z.boolean(),
       allowDiscardToPartnerDiscard: z.boolean(),

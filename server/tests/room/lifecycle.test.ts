@@ -63,6 +63,27 @@ describe('lifecycle', () => {
     expect(mgr.get(room.id)).toBeDefined();
   });
 
+  it('startGame auto-builds partnership teams from slot order (B1 audit)', () => {
+    const config = baseConfig();
+    config.maxPlayers = 4;
+    config.partnership = {
+      enabled: true,
+      teams: [], // client sends empty — server rebuilds from slots
+      allowPlayFromPartnerStock: true,
+      allowPlayFromPartnerDiscard: true,
+      allowDiscardToPartnerDiscard: false,
+    };
+    const { room } = mgr.create({ sessionId: 'h', playerName: 'H', config, allowAiFill: true, visibility: 'public' });
+    mgr.addMember(room.id, { sessionId: 'a', playerName: 'A' });
+    mgr.addMember(room.id, { sessionId: 'b', playerName: 'B' });
+    mgr.addMember(room.id, { sessionId: 'c', playerName: 'C' });
+    mgr.startGame(room.id, { actorSessionId: 'h' });
+    expect(room.phase).toBe('playing');
+    expect(room.game).not.toBeNull();
+    // Engine partnership pairs slot i with slot i + half.
+    expect(room.game!.config.partnership?.teams).toEqual([['h', 'b'], ['a', 'c']]);
+  });
+
   it('finish cleans up after 5 minutes', () => {
     const { room } = mgr.create({ sessionId: 'h', playerName: 'H', config: baseConfig(), allowAiFill: true, visibility: 'public' });
     mgr.addMember(room.id, { sessionId: 'a', playerName: 'A' });
