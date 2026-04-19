@@ -56,6 +56,10 @@ export interface GameView {
   config: PublicGameConfig;
   allowAiFill: boolean;
   youSlotIndex: number;
+  // Room join code. Not secret — anyone already in the room can share it
+  // with friends. Rides the GameView so the PreGameRoom doesn't need a
+  // separate REST fetch to display it.
+  code: string;
 }
 
 function publicizeConfig(room: Room, config: GameConfig): PublicGameConfig {
@@ -154,6 +158,7 @@ export function buildGameView(room: Room, sessionId: string, seats?: GameViewSea
       config: publicConfig,
       allowAiFill: room.allowAiFill,
       youSlotIndex: resolveYouSlotIndex(room, sessionId),
+      code: room.code,
     };
   }
   const raw = getPlayerView(room.game, sessionId);
@@ -179,5 +184,5 @@ export function buildGameView(room: Room, sessionId: string, seats?: GameViewSea
     you: youRest,
     opponents: publicizeOpponents(room, raw.opponents),
   };
-  return { view, seats: resolvedSeats, hostSlotIndex, config: publicConfig, allowAiFill: room.allowAiFill, youSlotIndex };
+  return { view, seats: resolvedSeats, hostSlotIndex, config: publicConfig, allowAiFill: room.allowAiFill, youSlotIndex, code: room.code };
 }

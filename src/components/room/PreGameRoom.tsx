@@ -22,6 +22,7 @@ export interface PreGameRoomProps {
   chat: ChatEntry[];
   onSendChat: (text: string) => void;
   allowAiFill: boolean;
+  code: string;
 }
 
 export function PreGameRoom(props: PreGameRoomProps) {
@@ -30,6 +31,15 @@ export function PreGameRoom(props: PreGameRoomProps) {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(props.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard denied — leave the code visible for manual copy */ }
+  };
 
   const slotSummary = summarize(props.seats);
 
@@ -100,12 +110,29 @@ export function PreGameRoom(props: PreGameRoomProps) {
   return (
     <main className="min-h-screen wood-frame p-4 sm:p-6">
       <div className="felt-surface rounded-xl p-4 sm:p-8 max-w-3xl mx-auto space-y-6">
-        <header className="flex items-center justify-between">
+        <header className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 sm:justify-between">
           <h1 className="text-lg sm:text-xl font-bold tracking-widest text-white">WAITING ROOM</h1>
-          <button type="button" onClick={handleLeave}
-            className="text-xs text-white/60 hover:text-white underline decoration-dotted">
-            Leave room
-          </button>
+          <div className="flex items-center gap-3 text-xs">
+            <div
+              className="flex items-center gap-2 rounded-full border border-[var(--gold)]/40 bg-black/40 px-3 py-1 text-white"
+              title="Share this code with a friend to invite them"
+            >
+              <span className="uppercase tracking-wider text-white/60">Code</span>
+              <span className="font-mono tracking-[0.2em] text-[var(--gold)] text-sm">{props.code}</span>
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                className="text-[10px] uppercase tracking-wider text-white/70 hover:text-white border border-white/10 rounded px-2 py-0.5"
+                aria-label="Copy room code"
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <button type="button" onClick={handleLeave}
+              className="text-xs text-white/60 hover:text-white underline decoration-dotted">
+              Leave room
+            </button>
+          </div>
         </header>
 
         <section>

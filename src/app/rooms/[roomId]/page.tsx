@@ -128,6 +128,7 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
         chat={socket.chat}
         onSendChat={socket.sendChat}
         allowAiFill={socket.view.allowAiFill}
+        code={socket.view.code}
       />
     );
   }

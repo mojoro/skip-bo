@@ -67,6 +67,9 @@ export interface GameView {
   config: PublicGameConfig;
   allowAiFill: boolean;
   youSlotIndex: number;
+  // Room join code — not a secret; rides the GameView so the waiting room
+  // can display it without a separate REST call.
+  code: string;
 }
 
 export type ClientMessage =
