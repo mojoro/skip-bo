@@ -64,14 +64,16 @@ export class RoomManager {
     return () => this.internalEvents.off('memberDisplaced', handler);
   }
 
-  // Fires after any REST mutation that changes room state visible to connected
-  // waiting-phase sockets: addMember, removeMember, setSlot, markUpdated, and
-  // startGame. Consumers (game layer) subscribe to fan-out a `state` frame to
-  // every WS-connected session in the room so their pre-game lobby view stays
-  // live without polling.
-  onWaitingStateChange(handler: (roomId: string) => void): () => void {
-    this.internalEvents.on('waitingStateChange', handler);
-    return () => this.internalEvents.off('waitingStateChange', handler);
+  // Fires after any REST mutation visible to sockets already attached to the
+  // room: addMember, removeMember, setSlot, markUpdated, and startGame.
+  // Consumers (game layer) subscribe to fan-out a `state` frame to every
+  // WS-connected session so their view stays live without polling. Covers
+  // both waiting-phase mutations and the startGame transition — after start,
+  // `buildGameView` returns a populated PlayerView and the same event drives
+  // pre-game sockets into the Board.
+  onRoomStateChange(handler: (roomId: string) => void): () => void {
+    this.internalEvents.on('roomStateChange', handler);
+    return () => this.internalEvents.off('roomStateChange', handler);
   }
 
   create(input: CreateRoomInput): { room: Room } {
@@ -499,7 +501,7 @@ export class RoomManager {
   }
 
   private emitStateChange(room: Room): void {
-    this.internalEvents.emit('waitingStateChange', room.id);
+    this.internalEvents.emit('roomStateChange', room.id);
   }
 
   private allocateCode(): string {

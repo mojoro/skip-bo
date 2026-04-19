@@ -23,7 +23,7 @@ async function startHarness() {
     gameRegistry.forEachInRoom(roomId, (conn) => conn.close(4005, 'room closed'));
   });
   // Mirror production wiring: REST mutations → broadcast state to connected sockets.
-  mgr.onWaitingStateChange((roomId) => {
+  mgr.onRoomStateChange((roomId) => {
     const room = mgr.get(roomId);
     if (!room) return;
     broadcastRoomState(room, gameRegistry);

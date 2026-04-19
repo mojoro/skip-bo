@@ -36,11 +36,11 @@ function main(): void {
     const conn = gameRegistry.findBySession(roomId, sessionId);
     if (conn) conn.close(4002, 'kicked');
   });
-  // Fan-out room state to all connected waiting-phase sockets whenever a REST
-  // mutation changes the room (member join/leave, slot config, game start).
+  // Fan-out room state to every attached game-WS socket when a REST mutation
+  // changes the room (join/leave, slot config, game start, config patch).
   // After startGame the phase is 'playing' and buildGameView returns a full
-  // PlayerView, so waiting sockets automatically transition to the Board.
-  roomManager.onWaitingStateChange((roomId) => {
+  // PlayerView, so the same event drives pre-game sockets into the Board.
+  roomManager.onRoomStateChange((roomId) => {
     const room = roomManager.get(roomId);
     if (!room) return;
     broadcastRoomState(room, gameRegistry);
