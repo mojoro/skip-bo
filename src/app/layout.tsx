@@ -81,6 +81,11 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // Ask mobile browsers to shrink the layout viewport when the virtual
+  // keyboard appears, rather than sliding the whole page up — keeps the
+  // chat dock pinned to the real visible bottom instead of jarring the
+  // entire tabletop.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

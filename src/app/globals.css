@@ -79,16 +79,35 @@
     );
 }
 
+html,
+body {
+  /* Deepest felt tone paints the safe-area regions (iOS status bar, home
+     indicator, overscroll bounce) so no white framing shows around the
+     tabletop or waiting room. */
+  background-color: var(--felt-deep);
+}
+
 body {
   color: #f3f4f6;
   font-family: ui-sans-serif, system-ui, -apple-system, Arial, Helvetica, sans-serif;
-  overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  /* Prevents the viewport from bouncing past the document edge on iOS, which
+     would reveal the safe-area fill and feel broken mid-game. */
+  overscroll-behavior: none;
+}
+
+/* Drag-and-drop on the tabletop uses Pointer Events; without this the
+   browser fights the drag with native scroll/zoom gestures on touch devices.
+   Inputs inside this surface re-enable their own touch-action below. */
+.felt-surface {
+  touch-action: none;
 }
 
 input,
 textarea {
   user-select: auto;
   -webkit-user-select: auto;
+  touch-action: auto;
 }
