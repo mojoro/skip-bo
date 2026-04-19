@@ -47,6 +47,16 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
   }, [socket.rematchRoomId]);
 
   const onBackToLobby = useCallback(() => router.push('/'), [router]);
+
+  // 4003 = "invalid session" / "no slot" — the server doesn't know this user
+  // for this room. Happens most often when a stale roomId is reopened after
+  // the room was cleaned up. Kick back to the lobby instead of stranding the
+  // user on a dead-end panel they can only escape via the browser chrome.
+  useEffect(() => {
+    if (socket.status === 'closed' && socket.lastError?.code === 4003) {
+      router.replace('/');
+    }
+  }, [socket.status, socket.lastError?.code, router]);
   const onRequestRematch = useCallback(() => {
     if (socket.rematchRoomId || rematchPending) return;
     setRematchPending(true);
