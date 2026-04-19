@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameAction } from '@/lib/game/types';
 import type { ChatEntry, ClientMessage, GameView, ServerMessage } from './protocol';
 import { TERMINAL_CLOSE_CODES } from './protocol';
+import { gameWsBaseUrl } from './endpoints';
 
 export const MAX_RECONNECT_ATTEMPT = 16;
 
@@ -82,15 +83,11 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
     // earn a 400 from the handshake and noise up the console before React
     // re-renders with the real id.
     if (!roomId || !sessionId) return;
-    // Match the page's protocol. Without this, a Next.js app served over HTTPS
-    // that tries to open `ws://` gets blocked as mixed content by every modern
-    // browser — the whole networked game would stop working on the production
-    // deploy while still working on localhost.
-    const base = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_GAME_WS_URL)
-      || (typeof window !== 'undefined'
-          ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
-          : '');
-    const url = `${base}/rooms/${encodeURIComponent(roomId)}/game?sessionId=${encodeURIComponent(sessionId)}`;
+    // `gameWsBaseUrl()` resolves via env override → `${hostname}:8787` →
+    // `localhost:8787` SSR fallback. Using hostname (not host) drops the
+    // Next dev-server port so LAN peers reach the game server at :8787 on
+    // the same machine that served the page.
+    const url = `${gameWsBaseUrl()}/rooms/${encodeURIComponent(roomId)}/game?sessionId=${encodeURIComponent(sessionId)}`;
     setStatus((prev) => (prev === 'closed' ? prev : (attemptRef.current === 0 ? 'connecting' : 'reconnecting')));
     const ws = new WebSocket(url);
     wsRef.current = ws;

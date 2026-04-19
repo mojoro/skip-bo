@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Lobby } from '@/components/lobby/Lobby';
 import { useDisplayName } from '@/lib/net/useDisplayName';
+import { gameApiBaseUrl } from '@/lib/net/endpoints';
 
 function useSessionId(): string | null {
   const [id, setId] = useState<string | null>(null);
@@ -22,7 +23,7 @@ export default function LandingPage() {
   const [name, setName] = useDisplayName();
   const [draft, setDraft] = useState('');
 
-  const baseUrl = process.env.NEXT_PUBLIC_GAME_API_URL ?? 'http://localhost:8787';
+  const baseUrl = gameApiBaseUrl();
 
   if (!sessionId) {
     return <LandingFrame><div className="text-center text-white/50 italic">Loading…</div></LandingFrame>;

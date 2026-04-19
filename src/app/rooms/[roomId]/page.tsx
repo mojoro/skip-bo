@@ -7,6 +7,7 @@ import Board from '@/components/Board';
 import { PreGameRoom } from '@/components/room/PreGameRoom';
 import type { WinModalAction } from '@/components/WinModal';
 import { leaveRoom } from '@/lib/net/api';
+import { gameApiBaseUrl } from '@/lib/net/endpoints';
 
 function useSessionId(): string | null {
   const [id, setId] = useState<string | null>(null);
@@ -102,7 +103,7 @@ export default function NetworkedRoomPage({ params }: { params: Promise<{ roomId
 
   const { view, seats } = socket.view;
 
-  const baseUrl = process.env.NEXT_PUBLIC_GAME_API_URL ?? 'http://localhost:8787';
+  const baseUrl = gameApiBaseUrl();
 
   const handleLeaveGame = async () => {
     // Confirm before forfeiting — the server flips the seat to bot-controlled
