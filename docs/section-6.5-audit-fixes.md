@@ -20,6 +20,7 @@ Single-pass audit of branch `feature/section-6.5-lobby`, implemented by a Sonnet
 | `50dfaab` | Add Leave game button to the in-play Board header (UX round 2) |
 | `d9f1fa6` | Count explicit AI slots toward startGame player minimum (UX round 3) |
 | `4b0f99a` | Treat finished rooms as unseated in GET v1 me room (UX round 3) |
+| `8a79127` | Always fill open slots with AI at startGame so solo vs bot works (UX round 4) |
 
 ## Findings
 
@@ -74,8 +75,8 @@ Section 3's A1/A2 ratchet (`server/src/game/view.ts:publicizeConfig`) already sa
 
 ## Verification
 
-- Server suite: 151/151 after round 3 (was 148 after round 2, 142 after round 1, 139 before fixes; +12 regression tests).
-- Root suite: 141/141 after round 3 (+2 for AI-slot start and all-AI rejection; 139 after round 2).
+- Server suite: 152/152 after round 4 (was 151 after round 3, 148 after round 2, 142 after round 1, 139 before fixes; +13 regression tests).
+- Root suite: 141/141 after round 4 (one test swapped for the new solo-vs-bot scenario; total unchanged from round 3).
 - Server typecheck: clean.
 - Root typecheck: still fails only on pre-existing follow-up #13 (`@engine/*` alias under `server/`), unchanged.
 - Not browser-verified: fixes are on wire-shape + server internals; existing Playwright walk-through from Task 26 still describes the UI end-to-end behavior.
@@ -148,6 +149,18 @@ New regression tests:
 - `server/tests/room/lifecycle.test.ts` — session freed from a finished room can create a new one.
 
 **Files:** `server/src/http/handlers/rooms.ts`, `server/src/room/manager.ts`, `server/tests/http/rooms.test.ts`, `server/tests/room/lifecycle.test.ts`.
+
+## Round 4 — solo-vs-bot start
+
+### C7 (Bug — blocked flow). Solo host couldn't start a game vs bots
+
+**Bug.** `startGame` still rejected with `openSlots` when `room.allowAiFill` was `false` and open seats remained. The lobby's "Create room" form defaults `allowAiFill` to off, so a host who wanted to play immediately against bots had to either toggle the flag or manually setSlot every open seat to AI. Neither was obvious, so the reported flow — create room, click Start — failed with a user-facing `tooFew` / `openSlots` toast.
+
+**Fix.** `startGame` no longer consults `allowAiFill` at start time. Any open seat is filled with AI unconditionally. The remaining preconditions are `humans >= 1` (a room needs an owner) and `humans + ai + open >= 2` (engine needs two players). `canStart` mirrors the simpler rule; `allowAiFill` stays in the signature for API stability but is ignored. Tooltip on the Start button now says "open seats will be filled with AI" when any remain.
+
+Tests updated: the previous "rejects with <2 players and no ai fill" now tests the equivalent failure (solo host + every other seat locked). A new regression covers the user's exact flow — 2-seat room, solo host, `allowAiFill: false`, Start → playing, slot 1 is AI.
+
+**Files:** `server/src/room/manager.ts`, `server/tests/room/lifecycle.test.ts`, `src/components/room/StartButton.tsx`, `src/components/room/StartButton.test.tsx`.
 
 ## Minor findings noted but not fixed
 
