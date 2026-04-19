@@ -94,8 +94,16 @@ export default function LocalHome() {
   if (!state || !view || !seats) {
     return (
       <>
-        <div className="wood-frame min-h-screen p-2 sm:p-3">
-          <div className="felt-surface relative rounded-xl overflow-hidden h-[calc(100vh-24px)] sm:h-[calc(100vh-32px)]" />
+        <div
+          className="wood-frame h-[100dvh] flex flex-col"
+          style={{
+            paddingTop: 'max(0.5rem, env(safe-area-inset-top))',
+            paddingRight: 'max(0.5rem, env(safe-area-inset-right))',
+            paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
+            paddingLeft: 'max(0.5rem, env(safe-area-inset-left))',
+          }}
+        >
+          <div className="felt-surface relative rounded-xl overflow-hidden flex-1 min-h-0" />
         </div>
         <NewGameModal
           open={newGameOpen}
