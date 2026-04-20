@@ -163,9 +163,15 @@ export default function GameChatDock({ chat, onSend }: GameChatDockProps) {
           <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-black/70">
-            {unread > 99 ? '99+' : unread}
-          </span>
+          <>
+            <span
+              aria-hidden
+              className="absolute -top-1 -right-1 min-w-[20px] h-5 rounded-full bg-rose-500 animate-ping opacity-60"
+            />
+            <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold tabular-nums flex items-center justify-center ring-2 ring-black/70">
+              {unread > 99 ? '99+' : unread}
+            </span>
+          </>
         )}
       </button>
     );
