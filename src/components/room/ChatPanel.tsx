@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ChatEntry } from '@/lib/net/protocol';
 
 export interface ChatPanelProps {
@@ -10,6 +10,7 @@ export interface ChatPanelProps {
 
 export function ChatPanel({ chat, onSend }: ChatPanelProps) {
   const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,6 +18,24 @@ export function ChatPanel({ chat, onSend }: ChatPanelProps) {
     if (!trimmed) return;
     onSend(trimmed);
     setDraft('');
+  };
+
+  // iOS Safari (and some Android browsers) only scroll a focused input above
+  // the virtual keyboard once the input's value changes, not on focus itself.
+  // We poll scrollIntoView across the keyboard's animation window so the
+  // composer lifts the moment the keyboard opens.
+  const handleFocus = () => {
+    const node = inputRef.current;
+    if (!node) return;
+    const start = performance.now();
+    const DURATION_MS = 500;
+    const tick = () => {
+      node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (performance.now() - start < DURATION_MS) {
+        window.requestAnimationFrame(tick);
+      }
+    };
+    tick();
   };
 
   return (
@@ -31,10 +50,12 @@ export function ChatPanel({ chat, onSend }: ChatPanelProps) {
       </ol>
       <form onSubmit={submit} className="border-t border-white/10 p-2 flex gap-2">
         <input
+          ref={inputRef}
           type="text"
           placeholder="Type a message…"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onFocus={handleFocus}
           className="flex-1 bg-black/40 border border-white/15 rounded px-2 py-1 text-xs text-white"
           maxLength={200}
         />
