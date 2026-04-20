@@ -108,9 +108,9 @@ export function useDraggable({ id, data, disabled }: UseDraggableOptions): UseDr
         window.removeEventListener('pointercancel', onCancel);
       };
 
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onCancel);
-      window.addEventListener('pointercancel', onCancel);
+      window.addEventListener('pointermove', onMove, { passive: true });
+      window.addEventListener('pointerup', onCancel, { passive: true });
+      window.addEventListener('pointercancel', onCancel, { passive: true });
     },
     [store],
   );
@@ -121,7 +121,9 @@ export function useDraggable({ id, data, disabled }: UseDraggableOptions): UseDr
       if (prev === element) return;
       if (prev) prev.removeEventListener('pointerdown', onPointerDown);
       elementRef.current = element;
-      if (element) element.addEventListener('pointerdown', onPointerDown);
+      if (element) {
+        element.addEventListener('pointerdown', onPointerDown, { passive: true });
+      }
     },
     [onPointerDown],
   );

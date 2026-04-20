@@ -63,9 +63,12 @@ export function DragDropProvider({ onDragEnd, children }: DragDropProviderProps)
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && store.getDrag()) store.endDrag('cancel');
     };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onCancel);
+    // Pointer listeners never call preventDefault here (the tabletop surface
+    // sets `touch-action: none` instead), so they can run as passive and let
+    // the scheduler coalesce them with compositor work.
+    window.addEventListener('pointermove', onMove, { passive: true });
+    window.addEventListener('pointerup', onUp, { passive: true });
+    window.addEventListener('pointercancel', onCancel, { passive: true });
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('pointermove', onMove);
