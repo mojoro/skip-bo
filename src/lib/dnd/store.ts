@@ -41,6 +41,12 @@ export class DragDropStore {
   private readonly targets = new Map<string, TargetRegistration>();
   private readonly listeners = new Set<() => void>();
   private ghostEl: HTMLDivElement | null = null;
+  // Pointermove can fire at 120+ Hz on touch devices; coalesce into one
+  // rAF-per-frame so the ghost transform + hit-test + hover-notify cost at
+  // most once per paint.
+  private pendingFrame = 0;
+  private lastX = 0;
+  private lastY = 0;
 
   onDragEnd: DragEndHandler | null = null;
 
@@ -97,25 +103,38 @@ export class DragDropStore {
       // setState calls don't land during our notify pass.
       this.onDragEnd?.(drag.sourceData, target);
     }
+    if (this.pendingFrame) {
+      cancelAnimationFrame(this.pendingFrame);
+      this.pendingFrame = 0;
+    }
     this.drag = null;
     this.hoveredTargetId = null;
     this.notify();
   }
 
   handlePointerMove(clientX: number, clientY: number): void {
+    if (!this.drag) return;
+    this.lastX = clientX;
+    this.lastY = clientY;
+    if (this.pendingFrame) return;
+    this.pendingFrame = requestAnimationFrame(this.flushPointerMove);
+  }
+
+  private flushPointerMove = (): void => {
+    this.pendingFrame = 0;
     const drag = this.drag;
     if (!drag) return;
-    const x = clientX - drag.pointerOffset.x;
-    const y = clientY - drag.pointerOffset.y;
+    const x = this.lastX - drag.pointerOffset.x;
+    const y = this.lastY - drag.pointerOffset.y;
     if (this.ghostEl) {
       this.ghostEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
     }
-    const hit = this.hitTest(clientX, clientY);
+    const hit = this.hitTest(this.lastX, this.lastY);
     if (hit !== this.hoveredTargetId) {
       this.hoveredTargetId = hit;
       this.notify();
     }
-  }
+  };
 
   private hitTest(x: number, y: number): string | null {
     let bestId: string | null = null;
