@@ -44,18 +44,24 @@ export default function GameChatDock({ chat, onSend }: GameChatDockProps) {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const listRef = useRef<HTMLOListElement | null>(null);
 
-  // Reset derived state on open-transition during render (React Compiler's
+  // Reset derived state on transitions during render (React Compiler's
   // preferred pattern — `setState-in-effect` here triggers cascading renders).
-  // Snapshot lastSeen when the panel closes so the badge stays quiet for
-  // messages that arrived while it was open, and clear the keyboard offset
-  // so nothing lingers while closed.
+  // While the panel is open, keep `lastSeen` synced to the live chat length
+  // so the unread badge starts at zero the moment the user closes the panel.
+  // While the panel is closed, `lastSeen` is frozen and unread accumulates.
   const [prevOpen, setPrevOpen] = useState(open);
+  const [prevChatLen, setPrevChatLen] = useState(chat.length);
   if (prevOpen !== open) {
     setPrevOpen(open);
-    if (!open) {
+    if (open) {
       setLastSeen(chat.length);
+    } else {
       setKeyboardOffset(0);
     }
+  }
+  if (prevChatLen !== chat.length) {
+    setPrevChatLen(chat.length);
+    if (open) setLastSeen(chat.length);
   }
 
   // Auto-scroll the panel to the newest message whenever chat grows.
