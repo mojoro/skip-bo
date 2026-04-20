@@ -10,7 +10,7 @@ import { StatsChip } from './StatsChip';
 import { DisplayNameEditor } from './DisplayNameEditor';
 import { useLobbyStream } from '@/lib/net/useLobbyStream';
 import { useMySessionRoom } from '@/lib/net/useMySessionRoom';
-import { joinRoom, ApiError } from '@/lib/net/api';
+import { joinRoom, leaveRoom, ApiError } from '@/lib/net/api';
 
 export interface LobbyProps {
   baseUrl: string;
@@ -22,8 +22,9 @@ export interface LobbyProps {
 export function Lobby({ baseUrl, sessionId, displayName, onDisplayNameChange }: LobbyProps) {
   const router = useRouter();
   const { rooms, stats, connected } = useLobbyStream({ baseUrl, sessionId });
-  const { roomId: myRoomId } = useMySessionRoom({ baseUrl, sessionId });
+  const { roomId: myRoomId, refresh: refreshMyRoom } = useMySessionRoom({ baseUrl, sessionId });
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
 
   const handleJoin = useCallback(async (roomId: string) => {
     setJoinError(null);
@@ -37,6 +38,22 @@ export function Lobby({ baseUrl, sessionId, displayName, onDisplayNameChange }: 
 
   const handleCreated = (roomId: string) => router.push(`/rooms/${roomId}`);
   const handleJoinedByCode = (roomId: string) => router.push(`/rooms/${roomId}`);
+
+  const handleLeave = async () => {
+    if (typeof myRoomId !== 'string') return;
+    // Mirror the in-room leave flow: the server may flip the seat to a bot if
+    // the game is already playing, so confirm before acting.
+    if (!window.confirm('Leave this game? If it has already started, your seat will finish out with a bot.')) return;
+    setLeaving(true);
+    try {
+      await leaveRoom({ baseUrl, sessionId, roomId: myRoomId, targetSessionId: sessionId });
+    } catch {
+      // Room already deleted, network hiccup, etc. Either way the banner
+      // should drop after refresh — fall through.
+    }
+    refreshMyRoom();
+    setLeaving(false);
+  };
 
   const inRoom = typeof myRoomId === 'string';
 
@@ -64,15 +81,25 @@ export function Lobby({ baseUrl, sessionId, displayName, onDisplayNameChange }: 
         {inRoom && (
           <div className="mb-6 rounded-xl border border-[var(--gold)]/40 bg-black/40 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold text-white">You're in a game</div>
-              <div className="text-xs text-white/60">Rejoin your table. Leave there first if you want to start a different one.</div>
+              <div className="text-sm font-semibold text-white">You&apos;re in a game</div>
+              <div className="text-xs text-white/60">Rejoin your table, or leave it to start a different one.</div>
             </div>
-            <Link
-              href={`/rooms/${myRoomId}`}
-              className="self-start sm:self-auto bg-[var(--gold)] text-stone-900 font-semibold hover:brightness-110 px-4 py-2 rounded text-sm"
-            >
-              Resume →
-            </Link>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={handleLeave}
+                disabled={leaving}
+                className="border border-white/20 text-white/80 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded text-sm"
+              >
+                {leaving ? 'Leaving…' : 'Leave game'}
+              </button>
+              <Link
+                href={`/rooms/${myRoomId}`}
+                className="bg-[var(--gold)] text-stone-900 font-semibold hover:brightness-110 px-4 py-2 rounded text-sm"
+              >
+                Resume →
+              </Link>
+            </div>
           </div>
         )}
 
