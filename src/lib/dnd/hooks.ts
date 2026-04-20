@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
-import { useDragDrop } from './context';
+import { useCallback, useRef, useSyncExternalStore } from 'react';
+import { useDragDropStore } from './context';
 import { DragSourceData, DropTargetData } from './types';
 
 const DRAG_THRESHOLD_PX = 4;
@@ -18,27 +18,30 @@ export interface UseDroppableResult {
 }
 
 export function useDroppable({ id, data, disabled }: UseDroppableOptions): UseDroppableResult {
-  const { hoveredTargetId, registerTarget, unregisterTarget } = useDragDrop();
+  const store = useDragDropStore();
   const elementRef = useRef<HTMLElement | null>(null);
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
+  const isOver = useSyncExternalStore(
+    store.subscribe,
+    () => store.getHoverId() === id,
+    () => false,
+  );
 
   const ref = useCallback(
     (element: HTMLElement | null) => {
       if (elementRef.current === element) return;
-      if (elementRef.current) unregisterTarget(id);
+      if (elementRef.current) store.unregisterTarget(id);
       elementRef.current = element;
-      if (element && !disabled) registerTarget(id, { element, data });
+      if (element && !disabled) {
+        store.registerTarget(id, { element, data: dataRef.current });
+      }
     },
-    [id, data, disabled, registerTarget, unregisterTarget],
+    [id, disabled, store],
   );
 
-  useEffect(() => {
-    if (!elementRef.current) return;
-    if (disabled) unregisterTarget(id);
-    else registerTarget(id, { element: elementRef.current, data });
-    return () => unregisterTarget(id);
-  }, [id, data, disabled, registerTarget, unregisterTarget]);
-
-  return { ref, isOver: hoveredTargetId === id };
+  return { ref, isOver };
 }
 
 export interface UseDraggableOptions {
@@ -53,17 +56,26 @@ export interface UseDraggableResult {
 }
 
 export function useDraggable({ id, data, disabled }: UseDraggableOptions): UseDraggableResult {
-  const { drag, startDrag } = useDragDrop();
+  const store = useDragDropStore();
   const elementRef = useRef<HTMLElement | null>(null);
-  const configRef = useRef({ id, data, disabled });
-  configRef.current = { id, data, disabled };
+  const idRef = useRef(id);
+  const dataRef = useRef(data);
+  const disabledRef = useRef(disabled);
+  idRef.current = id;
+  dataRef.current = data;
+  disabledRef.current = disabled;
+
+  const isDragging = useSyncExternalStore(
+    store.subscribe,
+    () => store.getSourceId() === id,
+    () => false,
+  );
 
   const onPointerDown = useCallback(
     (e: PointerEvent) => {
-      const cfg = configRef.current;
       const element = elementRef.current;
-      if (cfg.disabled || !element) return;
-      if (e.button !== 0) return; // primary button only
+      if (disabledRef.current || !element) return;
+      if (e.button !== 0) return;
       const rect = element.getBoundingClientRect();
       const start = { x: e.clientX, y: e.clientY };
       const pointerOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -75,9 +87,9 @@ export function useDraggable({ id, data, disabled }: UseDraggableOptions): UseDr
         const dy = ev.clientY - start.y;
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
         cleanup();
-        startDrag({
-          sourceId: cfg.id,
-          sourceData: cfg.data,
+        store.startDrag({
+          sourceId: idRef.current,
+          sourceData: dataRef.current,
           pointerId,
           originRect: rect,
           pointerOffset,
@@ -97,7 +109,7 @@ export function useDraggable({ id, data, disabled }: UseDraggableOptions): UseDr
       window.addEventListener('pointerup', onCancel);
       window.addEventListener('pointercancel', onCancel);
     },
-    [startDrag],
+    [store],
   );
 
   const ref = useCallback(
@@ -111,5 +123,5 @@ export function useDraggable({ id, data, disabled }: UseDraggableOptions): UseDr
     [onPointerDown],
   );
 
-  return { ref, isDragging: drag?.sourceId === id };
+  return { ref, isDragging };
 }

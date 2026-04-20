@@ -1,18 +1,25 @@
 'use client';
 
-import { RefObject } from 'react';
+import { useCallback } from 'react';
 import Card from './Card';
-import type { DragState } from '@/lib/dnd/context';
+import type { DragDropStore, DragState } from '@/lib/dnd/store';
 
 interface DragGhostProps {
-  ghostRef: RefObject<HTMLDivElement | null>;
+  store: DragDropStore;
   drag: DragState;
 }
 
-export default function DragGhost({ ghostRef, drag }: DragGhostProps) {
+export default function DragGhost({ store, drag }: DragGhostProps) {
+  const ref = useCallback(
+    (el: HTMLDivElement | null) => {
+      store.setGhost(el);
+    },
+    [store],
+  );
+
   return (
     <div
-      ref={ghostRef}
+      ref={ref}
       style={{
         position: 'fixed',
         top: 0,
