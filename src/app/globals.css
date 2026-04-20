@@ -112,3 +112,13 @@ textarea {
   -webkit-user-select: auto;
   touch-action: auto;
 }
+
+/* iOS Safari auto-zooms any text input whose font-size is below 16px and the
+   user often cannot pinch back out. Force every text-y input to at least
+   16px so the zoom never fires. Visual size still scales above 16px via the
+   element's own font-size. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+textarea,
+select {
+  font-size: max(16px, 1em);
+}
