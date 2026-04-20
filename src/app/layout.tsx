@@ -81,11 +81,11 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  // Ask mobile browsers to shrink the layout viewport when the virtual
-  // keyboard appears, rather than sliding the whole page up — keeps the
-  // chat dock pinned to the real visible bottom instead of jarring the
-  // entire tabletop.
-  interactiveWidget: "resizes-content",
+  // Overlay the virtual keyboard on top of the layout viewport instead of
+  // shrinking it. In-game this keeps the tabletop from reflowing when the
+  // chat input is focused; the GameChatDock uses window.visualViewport to
+  // lift itself above the keyboard regardless.
+  interactiveWidget: "overlays-content",
 };
 
 export default function RootLayout({
