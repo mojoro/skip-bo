@@ -87,13 +87,16 @@ export function useDraggable({ id, data, disabled }: UseDraggableOptions): UseDr
         const dy = ev.clientY - start.y;
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
         cleanup();
-        store.startDrag({
-          sourceId: idRef.current,
-          sourceData: dataRef.current,
-          pointerId,
-          originRect: rect,
-          pointerOffset,
-        });
+        store.startDrag(
+          {
+            sourceId: idRef.current,
+            sourceData: dataRef.current,
+            pointerId,
+            originRect: rect,
+            pointerOffset,
+          },
+          element,
+        );
       };
       const onCancel = (ev: PointerEvent) => {
         if (ev.pointerId !== pointerId) return;

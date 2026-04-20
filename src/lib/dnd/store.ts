@@ -47,6 +47,10 @@ export class DragDropStore {
   private pendingFrame = 0;
   private lastX = 0;
   private lastY = 0;
+  // Element that currently holds pointer capture for the active drag, so we
+  // can release the capture when the drag ends regardless of where the pointer
+  // is by then.
+  private captureEl: HTMLElement | null = null;
 
   onDragEnd: DragEndHandler | null = null;
 
@@ -85,9 +89,20 @@ export class DragDropStore {
     this.targets.delete(id);
   }
 
-  startDrag(init: StartDragInit): void {
+  startDrag(init: StartDragInit, captureEl: HTMLElement | null): void {
     this.drag = { ...init };
     this.hoveredTargetId = null;
+    this.captureEl = captureEl;
+    // Claim the pointer so fast drags leaving the viewport, crossing iframe
+    // boundaries, or losing focus to the OS still deliver pointerup back here
+    // instead of orphaning the listeners.
+    if (captureEl && typeof captureEl.setPointerCapture === 'function') {
+      try {
+        captureEl.setPointerCapture(init.pointerId);
+      } catch {
+        /* pointer no longer active — nothing to capture */
+      }
+    }
     this.notify();
   }
 
@@ -107,6 +122,17 @@ export class DragDropStore {
       cancelAnimationFrame(this.pendingFrame);
       this.pendingFrame = 0;
     }
+    if (
+      this.captureEl &&
+      typeof this.captureEl.releasePointerCapture === 'function'
+    ) {
+      try {
+        this.captureEl.releasePointerCapture(drag.pointerId);
+      } catch {
+        /* already released by the browser on pointerup — safe to ignore */
+      }
+    }
+    this.captureEl = null;
     this.drag = null;
     this.hoveredTargetId = null;
     this.notify();
