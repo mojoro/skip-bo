@@ -6,11 +6,30 @@ export const contentType = 'image/png';
 
 type Palette = 'blue' | 'green' | 'red' | 'wild';
 
-const PALETTES: Record<Palette, { bg: string; fg: string }> = {
-  blue: { bg: 'linear-gradient(160deg, #2a63b4, #184a92)', fg: '#ffffff' },
-  green: { bg: 'linear-gradient(160deg, #2d8a4f, #1c5e34)', fg: '#ffffff' },
-  red: { bg: 'linear-gradient(160deg, #c83b3b, #8c1f1f)', fg: '#ffffff' },
-  wild: { bg: 'linear-gradient(160deg, #fff9ec, #f3e6c0)', fg: '#3b1d66' },
+// Match the in-game Card.tsx palette exactly so the OG preview reads as the
+// actual game art, not a placeholder. Wild uses a deep violet with a gold
+// accent ring — identical to the real wildcard after the redesign.
+const PALETTES: Record<Palette, { bg: string; fg: string; accent: string }> = {
+  blue: {
+    bg: 'linear-gradient(160deg, #2a63b4, #184a92)',
+    fg: '#ffffff',
+    accent: 'rgba(255,255,255,0.35)',
+  },
+  green: {
+    bg: 'linear-gradient(160deg, #2d8a4f, #1c5e34)',
+    fg: '#ffffff',
+    accent: 'rgba(255,255,255,0.35)',
+  },
+  red: {
+    bg: 'linear-gradient(160deg, #c83b3b, #8c1f1f)',
+    fg: '#ffffff',
+    accent: 'rgba(255,255,255,0.3)',
+  },
+  wild: {
+    bg: 'radial-gradient(circle at 30% 20%, #6b3cd6, #4c1d95 45%, #1f0f52 100%)',
+    fg: '#ffffff',
+    accent: '#f2c65a',
+  },
 };
 
 const CARDS: Array<{ value: string; palette: Palette; rotate: number; offset: number }> = [
@@ -20,6 +39,130 @@ const CARDS: Array<{ value: string; palette: Palette; rotate: number; offset: nu
   { value: '11', palette: 'red', rotate: 14, offset: 85 },
   { value: 'SB', palette: 'wild', rotate: 0, offset: 0 },
 ];
+
+const CARD_WIDTH = 184;
+const CARD_HEIGHT = 258;
+const BEVEL_INSET = 10;
+
+function CardFace({
+  value,
+  palette,
+  rotate,
+  offset,
+}: {
+  value: string;
+  palette: Palette;
+  rotate: number;
+  offset: number;
+}) {
+  const p = PALETTES[palette];
+  const isWild = value === 'SB';
+  const mainFontSize = isWild ? 92 : 118;
+  const cornerFontSize = 28;
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        width: CARD_WIDTH,
+        height: CARD_HEIGHT,
+        borderRadius: 16,
+        border: '3px solid rgba(0,0,0,0.4)',
+        background: p.bg,
+        color: p.fg,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 24px 44px rgba(0,0,0,0.55)',
+        transform: `translateX(${offset}px) rotate(${rotate}deg)`,
+      }}
+    >
+      {/* Inner bevel ring — gold on the wild, translucent white otherwise */}
+      <div
+        style={{
+          position: 'absolute',
+          top: BEVEL_INSET,
+          right: BEVEL_INSET,
+          bottom: BEVEL_INSET,
+          left: BEVEL_INSET,
+          borderRadius: 10,
+          border: `2px solid ${p.accent}`,
+        }}
+      />
+
+      {/* Corner rank — top-left */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 16,
+          left: 20,
+          fontSize: cornerFontSize,
+          fontWeight: 900,
+          letterSpacing: isWild ? 2 : -1,
+          lineHeight: 1,
+          display: 'flex',
+        }}
+      >
+        {value}
+      </div>
+
+      {/* Corner rank — bottom-right, rotated 180° */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 16,
+          right: 20,
+          fontSize: cornerFontSize,
+          fontWeight: 900,
+          letterSpacing: isWild ? 2 : -1,
+          lineHeight: 1,
+          transform: 'rotate(180deg)',
+          display: 'flex',
+        }}
+      >
+        {value}
+      </div>
+
+      {/* Center mark */}
+      <div
+        style={{
+          fontSize: mainFontSize,
+          fontWeight: 900,
+          lineHeight: 1,
+          letterSpacing: isWild ? 6 : -2,
+          textShadow: '0 2px 6px rgba(0,0,0,0.35)',
+          display: 'flex',
+        }}
+      >
+        {value}
+      </div>
+
+      {/* Wild starburst — simulated with eight thin gold slivers pointing out
+          from the center. Satori doesn't render conic-gradient, so we stamp
+          the rays as rotated rectangles. Kept subtle so it frames the "SB"
+          without overpowering the face. */}
+      {isWild && (
+        <>
+          {[0, 45, 90, 135].map((deg) => (
+            <div
+              key={deg}
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                width: CARD_HEIGHT * 0.82,
+                height: 3,
+                background:
+                  'linear-gradient(90deg, rgba(242,198,90,0) 0%, rgba(242,198,90,0.55) 50%, rgba(242,198,90,0) 100%)',
+                transform: `translate(-50%, -50%) rotate(${deg}deg)`,
+              }}
+            />
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function OpengraphImage() {
   return new ImageResponse(
@@ -118,33 +261,15 @@ export default function OpengraphImage() {
             justifyContent: 'center',
           }}
         >
-          {CARDS.map((c) => {
-            const p = PALETTES[c.palette];
-            return (
-              <div
-                key={c.value + c.offset}
-                style={{
-                  position: 'absolute',
-                  width: 184,
-                  height: 258,
-                  borderRadius: 16,
-                  border: '3px solid rgba(0,0,0,0.4)',
-                  background: p.bg,
-                  color: p.fg,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: c.value === 'SB' ? 84 : 110,
-                  fontWeight: 900,
-                  letterSpacing: c.value === 'SB' ? 4 : -2,
-                  boxShadow: '0 24px 44px rgba(0,0,0,0.55)',
-                  transform: `translateX(${c.offset}px) rotate(${c.rotate}deg)`,
-                }}
-              >
-                {c.value}
-              </div>
-            );
-          })}
+          {CARDS.map((c) => (
+            <CardFace
+              key={c.value + c.offset}
+              value={c.value}
+              palette={c.palette}
+              rotate={c.rotate}
+              offset={c.offset}
+            />
+          ))}
         </div>
       </div>
     ),
