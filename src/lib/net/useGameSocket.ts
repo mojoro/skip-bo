@@ -119,11 +119,12 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
         case 'state':
         case 'gameEnded':
           // Drop stale frames that arrive out of order. stateVersion grows
-          // monotonically within a game, so anything at or below the current
-          // watermark is either a duplicate (idempotent, cheap to skip) or a
-          // late reconnect-race frame that would rewind the UI to an earlier
-          // turn.
-          if (msg.stateVersion <= stateVersionRef.current) break;
+          // monotonically within a game, so anything strictly below the
+          // current watermark is a late reconnect-race frame that would
+          // rewind the UI to an earlier turn. Equal-version frames apply
+          // — during the waiting phase stateVersion is always 0 (no game
+          // yet), so waiting-room updates would otherwise get dropped.
+          if (msg.stateVersion < stateVersionRef.current) break;
           setView(msg.view);
           setStateVersion(msg.stateVersion);
           stateVersionRef.current = msg.stateVersion;
