@@ -141,29 +141,6 @@ function CardFace({
         {value}
       </div>
 
-      {/* Wild starburst — simulated with thin cream slivers pointing out
-          from the center. Satori doesn't render conic-gradient, so we stamp
-          the rays as rotated rectangles. Kept subtle so it frames the "SB"
-          without overpowering the face. */}
-      {isWild && (
-        <>
-          {[0, 45, 90, 135].map((deg) => (
-            <div
-              key={deg}
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                width: CARD_HEIGHT * 0.82,
-                height: 3,
-                background:
-                  'linear-gradient(90deg, rgba(255,245,214,0) 0%, rgba(255,245,214,0.7) 50%, rgba(255,245,214,0) 100%)',
-                transform: `translate(-50%, -50%) rotate(${deg}deg)`,
-              }}
-            />
-          ))}
-        </>
-      )}
     </div>
   );
 }
