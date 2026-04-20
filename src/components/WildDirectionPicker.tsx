@@ -34,7 +34,7 @@ export default function WildDirectionPicker({
     >
       <button
         onClick={onPickAsc}
-        className="flex-1 flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-emerald-600 to-emerald-800 text-white hover:brightness-110 active:brightness-90"
+        className="flex-1 flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-emerald-600 to-emerald-800 text-white hover:brightness-110 active:scale-[0.96] transition-transform"
         aria-label="Start ascending at 1"
       >
         <span className="text-lg leading-none">↑</span>
@@ -43,7 +43,7 @@ export default function WildDirectionPicker({
       <div className="h-px bg-black/40" />
       <button
         onClick={onPickDesc}
-        className="flex-1 flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-rose-600 to-rose-800 text-white hover:brightness-110 active:brightness-90"
+        className="flex-1 flex flex-col items-center justify-center gap-0.5 bg-gradient-to-b from-rose-600 to-rose-800 text-white hover:brightness-110 active:scale-[0.96] transition-transform"
         aria-label="Start descending at 12"
       >
         <span className="text-lg leading-none">↓</span>
