@@ -15,12 +15,12 @@ const geistMono = Geist_Mono({
 
 const SITE_URL = "https://skipbo.johnmoorman.com";
 const DESCRIPTION =
-  "Race to empty your stockpile in this classic Skip-Bo card game. Play online against friends in real-time rooms — no signup required.";
+  "Race to empty your stockpile in this classic Skip-Bo card game. Play online against friends in real-time rooms, no signup required.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Skip-Bo — online card game",
+    default: "Skip-Bo: online card game",
     template: "%s · Skip-Bo",
   },
   description: DESCRIPTION,
@@ -46,13 +46,13 @@ export const metadata: Metadata = {
     type: "website",
     url: SITE_URL,
     siteName: "Skip-Bo",
-    title: "Skip-Bo — online card game",
+    title: "Skip-Bo: online card game",
     description: DESCRIPTION,
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Skip-Bo — online card game",
+    title: "Skip-Bo: online card game",
     description: DESCRIPTION,
   },
   robots: {

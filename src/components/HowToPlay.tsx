@@ -35,7 +35,7 @@ export default function HowToPlay({ open, onClose }: HowToPlayProps) {
           </h3>
           <p className="text-sm leading-relaxed text-zinc-200">
             Be the first to empty your <strong>stock pile</strong>. Everything
-            else — your hand, your discard piles, the build piles in the middle —
+            else (your hand, your discard piles, the build piles in the middle)
             is just a means to that end.
           </p>
         </section>
@@ -46,15 +46,15 @@ export default function HowToPlay({ open, onClose }: HowToPlayProps) {
           </h3>
           <ul className="text-sm leading-relaxed text-zinc-200 list-disc pl-5 space-y-1">
             <li>
-              <strong>Stock pile</strong> — face-down; only the top card is
+              <strong>Stock pile</strong>: face-down; only the top card is
               visible. You must empty this to win.
             </li>
             <li>
-              <strong>Hand</strong> — up to 5 cards refilled from the draw pile
+              <strong>Hand</strong>: up to 5 cards refilled from the draw pile
               at the start of every turn.
             </li>
             <li>
-              <strong>Discard piles</strong> — four slots next to your hand.
+              <strong>Discard piles</strong>: four slots next to your hand.
               Used to park cards for later and to end your turn.
             </li>
           </ul>
@@ -83,7 +83,7 @@ export default function HowToPlay({ open, onClose }: HowToPlayProps) {
             </li>
           </ol>
           <p className="text-xs text-zinc-400 italic">
-            You always want to play your stock top if you can — that's the only
+            You always want to play your stock top if you can. That's the only
             way you make progress toward winning.
           </p>
         </section>
@@ -93,7 +93,7 @@ export default function HowToPlay({ open, onClose }: HowToPlayProps) {
             Skip-Bo cards (wilds)
           </h3>
           <p className="text-sm leading-relaxed text-zinc-200">
-            An <strong>SB</strong> card is wild — it plays as whatever number
+            An <strong>SB</strong> card is wild: it plays as whatever number
             fits. In the bidirectional ruleset, playing an SB onto an empty
             build pile lets you choose whether the pile will count up or down.
           </p>
@@ -109,7 +109,7 @@ export default function HowToPlay({ open, onClose }: HowToPlayProps) {
               so you can unload them in one turn later.
             </li>
             <li>
-              Hold off low cards if your stock top is close — starting a build
+              Hold off low cards if your stock top is close. Starting a build
               pile you can ride up to your stock number is how you win.
             </li>
             <li>
@@ -117,7 +117,7 @@ export default function HowToPlay({ open, onClose }: HowToPlayProps) {
               is a card your opponent gets another turn to counter.
             </li>
             <li>
-              Track what your opponent is stacking on their discard piles —
+              Track what your opponent is stacking on their discard piles;
               their discard tops are their next available plays.
             </li>
           </ul>
@@ -128,8 +128,8 @@ export default function HowToPlay({ open, onClose }: HowToPlayProps) {
             Winning
           </h3>
           <p className="text-sm leading-relaxed text-zinc-200">
-            The moment your stock pile hits zero — whether by a single play or
-            a cascade — the game ends. In partnership mode either teammate
+            The moment your stock pile hits zero, whether by a single play or
+            a cascade, the game ends. In partnership mode either teammate
             emptying their stock wins for the team.
           </p>
         </section>

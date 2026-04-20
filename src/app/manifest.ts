@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Skip-Bo — online card game',
+    name: 'Skip-Bo: online card game',
     short_name: 'Skip-Bo',
     description:
       'Race to empty your stockpile in this classic Skip-Bo card game. Play online against friends in real-time rooms.',

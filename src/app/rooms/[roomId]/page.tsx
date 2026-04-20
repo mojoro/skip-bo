@@ -201,7 +201,7 @@ function Closed({ code, reason }: { code?: number; reason?: string }) {
       <h1 className="text-xl text-rose-200 font-semibold">Disconnected</h1>
       <div className="text-sm text-white/70">
         <span className="font-mono text-rose-200/80">close {code ?? '?'}</span>
-        {reason ? <span className="ml-2 text-white/50">— {reason}</span> : null}
+        {reason ? <span className="ml-2 text-white/50">· {reason}</span> : null}
       </div>
       <p className="text-xs text-white/45">This close code is terminal; reload the page to try again.</p>
     </div>

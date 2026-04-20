@@ -65,7 +65,7 @@ export function Lobby({ baseUrl, sessionId, displayName, onDisplayNameChange }: 
           <div className="mb-6 rounded-xl border border-[var(--gold)]/40 bg-black/40 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-white">You're in a game</div>
-              <div className="text-xs text-white/60">Rejoin your table — leave there first if you want to start a different one.</div>
+              <div className="text-xs text-white/60">Rejoin your table. Leave there first if you want to start a different one.</div>
             </div>
             <Link
               href={`/rooms/${myRoomId}`}

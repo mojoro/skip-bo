@@ -8,7 +8,7 @@ export class ApiError extends Error {
     public readonly detail: string | null,
     public readonly reason: string | null,
   ) {
-    super(`${status} ${title}${detail ? ` — ${detail}` : ''}`);
+    super(`${status} ${title}${detail ? `: ${detail}` : ''}`);
   }
 }
 
