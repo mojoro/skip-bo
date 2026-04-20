@@ -142,7 +142,9 @@ export function MobileBoardView({
           <div className="flex items-center justify-between w-full">
             <span className="text-[11px] font-semibold text-white">
               {self.name}
-              <span className="text-[var(--gold)] ml-1">· your turn</span>
+              {self.isActive && (
+                <span className="text-[var(--gold)] ml-1">· your turn</span>
+              )}
             </span>
             <span className="text-[9px] text-white/60 uppercase tracking-wider">
               HAND · {self.handCount}
