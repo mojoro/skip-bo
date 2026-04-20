@@ -43,11 +43,11 @@ const PALETTE_STYLES: Record<CardPalette, { bg: string; text: string; accent: st
     text: '#ffffff',
     accent: 'rgba(255,255,255,0.3)',
   },
-  // Deep violet with a gold accent ring — the wild now reads as premium and
-  // stands out clearly from any numbered suit.
+  // Sunny yellow-to-burnt-orange — the wild now reads as a warm, distinct
+  // "Skip-Bo" face that stands out against any numbered suit.
   wild: {
-    bg: 'radial-gradient(circle at 30% 20%, #6b3cd6, var(--card-wild-a) 45%, var(--card-wild-b) 100%)',
-    text: '#ffffff',
+    bg: 'radial-gradient(circle at 30% 20%, #fde68a, var(--card-wild-a) 45%, var(--card-wild-b) 100%)',
+    text: '#3d1a04',
     accent: 'var(--card-wild-accent)',
   },
 };
@@ -142,7 +142,7 @@ export default function Card({
           className="absolute inset-[3px] rounded-[4px] border pointer-events-none"
           style={{
             borderColor: isWild ? 'var(--card-wild-accent)' : styles.accent,
-            boxShadow: isWild ? 'inset 0 0 6px rgba(242,198,90,0.35)' : undefined,
+            boxShadow: isWild ? 'inset 0 0 6px rgba(255,245,214,0.55)' : undefined,
           }}
         />
         {/* Corner rank (top-left) */}
@@ -172,9 +172,8 @@ export default function Card({
             className="absolute inset-0 rounded-md pointer-events-none"
             style={{
               background:
-                'repeating-conic-gradient(from 22.5deg, rgba(242,198,90,0.18) 0deg 9deg, transparent 9deg 22.5deg)',
-              mixBlendMode: 'screen',
-              opacity: 0.55,
+                'repeating-conic-gradient(from 22.5deg, rgba(255,245,214,0.28) 0deg 9deg, transparent 9deg 22.5deg)',
+              opacity: 0.7,
             }}
           />
         )}
@@ -187,7 +186,7 @@ export default function Card({
             className="absolute top-1 right-1 rounded px-1 text-[9px] font-black tracking-widest leading-none"
             style={{
               background: 'var(--card-wild-accent)',
-              color: '#2a0f5a',
+              color: '#3d1a04',
               boxShadow: '0 0 0 1px rgba(0,0,0,0.25)',
             }}
           >

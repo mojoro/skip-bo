@@ -17,9 +17,9 @@
   --card-green-b: #1c5e34;
   --card-red-a: #c83b3b;
   --card-red-b: #8c1f1f;
-  --card-wild-a: #4c1d95;
-  --card-wild-b: #1f0f52;
-  --card-wild-accent: #f2c65a;
+  --card-wild-a: #fbbf24;
+  --card-wild-b: #b45309;
+  --card-wild-accent: #fff5d6;
 }
 
 /* Felt background: deep green with SVG noise overlay for felt grain */

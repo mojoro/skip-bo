@@ -26,9 +26,9 @@ const PALETTES: Record<Palette, { bg: string; fg: string; accent: string }> = {
     accent: 'rgba(255,255,255,0.3)',
   },
   wild: {
-    bg: 'radial-gradient(circle at 30% 20%, #6b3cd6, #4c1d95 45%, #1f0f52 100%)',
-    fg: '#ffffff',
-    accent: '#f2c65a',
+    bg: 'radial-gradient(circle at 30% 20%, #fde68a, #fbbf24 45%, #b45309 100%)',
+    fg: '#3d1a04',
+    accent: '#fff5d6',
   },
 };
 
@@ -137,7 +137,7 @@ function CardFace({
         {value}
       </div>
 
-      {/* Wild starburst — simulated with eight thin gold slivers pointing out
+      {/* Wild starburst — simulated with thin cream slivers pointing out
           from the center. Satori doesn't render conic-gradient, so we stamp
           the rays as rotated rectangles. Kept subtle so it frames the "SB"
           without overpowering the face. */}
@@ -153,7 +153,7 @@ function CardFace({
                 width: CARD_HEIGHT * 0.82,
                 height: 3,
                 background:
-                  'linear-gradient(90deg, rgba(242,198,90,0) 0%, rgba(242,198,90,0.55) 50%, rgba(242,198,90,0) 100%)',
+                  'linear-gradient(90deg, rgba(255,245,214,0) 0%, rgba(255,245,214,0.7) 50%, rgba(255,245,214,0) 100%)',
                 transform: `translate(-50%, -50%) rotate(${deg}deg)`,
               }}
             />
