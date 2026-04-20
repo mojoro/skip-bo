@@ -19,12 +19,19 @@ export default function GameChatDock({ chat, onSend }: GameChatDockProps) {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const listRef = useRef<HTMLOListElement | null>(null);
 
-  // Keep the read marker pinned to the tail while the panel is open so
-  // freshly-arriving messages don't flash the unread badge under the user's
-  // nose.
-  useEffect(() => {
-    if (open) setLastSeen(chat.length);
-  }, [open, chat.length]);
+  // Reset derived state on open-transition during render (React Compiler's
+  // preferred pattern — `setState-in-effect` here triggers cascading renders).
+  // Snapshot lastSeen when the panel closes so the badge stays quiet for
+  // messages that arrived while it was open, and clear the keyboard offset
+  // so nothing lingers while closed.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    if (!open) {
+      setLastSeen(chat.length);
+      setKeyboardOffset(0);
+    }
+  }
 
   // Auto-scroll the panel to the newest message whenever chat grows.
   useEffect(() => {
@@ -34,22 +41,58 @@ export default function GameChatDock({ chat, onSend }: GameChatDockProps) {
   }, [chat.length, open]);
 
   // Track the visual viewport so the dock floats above the virtual keyboard
-  // even when the browser doesn't resize the layout viewport.
+  // even when the browser doesn't resize the layout viewport. iOS Safari
+  // fires `resize` late during the keyboard animation, so we also pump a
+  // rAF loop for ~600ms whenever focus moves into or out of an input — that
+  // way the dock tracks the keyboard in real time instead of waiting for
+  // the first resize event.
   useEffect(() => {
-    if (!open) { setKeyboardOffset(0); return; }
+    if (!open) return;
     if (typeof window === 'undefined' || !window.visualViewport) return;
     const vv = window.visualViewport;
+    let cancelled = false;
+    let pumpingUntil = 0;
+    let pumping = false;
+
     const measure = () => {
+      if (cancelled) return;
       const layoutHeight = window.innerHeight;
       const hidden = Math.max(0, layoutHeight - vv.height - vv.offsetTop);
       setKeyboardOffset(hidden);
     };
+
+    const pump = () => {
+      if (cancelled) { pumping = false; return; }
+      measure();
+      if (performance.now() < pumpingUntil) {
+        window.requestAnimationFrame(pump);
+      } else {
+        pumping = false;
+      }
+    };
+
+    const kickPump = (durationMs: number) => {
+      pumpingUntil = performance.now() + durationMs;
+      if (!pumping) {
+        pumping = true;
+        window.requestAnimationFrame(pump);
+      }
+    };
+
+    const onFocusIn = () => kickPump(600);
+    const onFocusOut = () => kickPump(400);
+
     measure();
     vv.addEventListener('resize', measure);
     vv.addEventListener('scroll', measure);
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('focusout', onFocusOut);
     return () => {
+      cancelled = true;
       vv.removeEventListener('resize', measure);
       vv.removeEventListener('scroll', measure);
+      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('focusout', onFocusOut);
     };
   }, [open]);
 
