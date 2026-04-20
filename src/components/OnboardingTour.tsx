@@ -66,7 +66,7 @@ function buildSteps(isDesktop: boolean): TourStep[] {
       selector: '[data-tour="build"]',
       placement: isDesktop ? 'bottom' : 'top',
       title: 'Build piles',
-      body: 'Shared by everyone. Start a pile with a 1 or a Skip-Bo (wild), then stack 2, 3, 4 … up to 12. Completed piles clear and play continues.',
+      body: 'Shared by everyone. Start a pile with a 1 or a Skip-Bo (wild), then stack 2, 3, 4 … up to 12. Depending on your lobby rules, you may also be allowed to start with a 12 and stack down to 1. Completed piles clear and play continues.',
     },
     {
       selector: '[data-tour="discard"]',
