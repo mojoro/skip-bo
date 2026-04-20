@@ -72,13 +72,7 @@ npm test                     # vitest run (153 tests)
 npx tsc --noEmit             # typecheck — clean
 ```
 
-Networked client needs `.env.local` at the repo root:
-
-```
-NEXT_PUBLIC_GAME_WS_URL=ws://localhost:8787
-```
-
-Without it, `useGameSocket` falls back to `ws://<page-host>` and can't reach the server.
+Networked client needs no `.env.local` for dev. `src/lib/net/endpoints.ts` derives `ws://<page-host>:8787` (and matching REST base) from the hostname, so both `localhost` and LAN-IP loads resolve correctly. Only set `NEXT_PUBLIC_GAME_WS_URL` / `NEXT_PUBLIC_GAME_API_URL` if you need to pin a non-standard target (e.g. a remote server). **Pinning the WS URL to `ws://localhost:8787` breaks LAN play** because peers resolve `localhost` to themselves.
 
 ## Layout
 
