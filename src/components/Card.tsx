@@ -71,7 +71,7 @@ export default function Card({
 }: CardProps) {
   const S = SIZE_STYLES[size];
   const interactable = !!onClick;
-  const base = `${S.w} ${S.h} rounded-md relative select-none transition-transform will-change-transform`;
+  const base = `${S.w} ${S.h} rounded-md relative select-none transition-[transform,box-shadow] will-change-transform`;
   const hover = interactable ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg' : '';
   const glow = highlighted ? 'card-glow' : 'shadow-[0_4px_6px_rgba(0,0,0,0.4)]';
   const dimmed = dim ? 'opacity-35' : '';
