@@ -54,7 +54,7 @@ function buildSteps(isDesktop: boolean): TourStep[] {
       selector: '[data-tour="stock"]',
       placement: 'auto',
       title: 'Your stock pile',
-      body: 'This is what you are racing to empty. The top card is visible — play it onto a build pile whenever you can. First to zero wins.',
+      body: 'This is what you are racing to empty. The top card is visible. Play it onto a build pile whenever you can. First to zero wins.',
     },
     {
       selector: '[data-tour="hand"]',
@@ -72,7 +72,13 @@ function buildSteps(isDesktop: boolean): TourStep[] {
       selector: '[data-tour="discard"]',
       placement: 'top',
       title: 'Your discard piles',
-      body: 'Four personal piles. End your turn by discarding one card here. On future turns the top of each pile is playable, so discard strategically.',
+      body: 'Four personal piles next to your hand. On future turns the top of each pile is playable, so discard strategically.',
+    },
+    {
+      selector: '[data-tour="discard"]',
+      placement: 'top',
+      title: 'Ending your turn',
+      body: 'To end your turn, you must discard exactly one card from your hand onto one of your discard piles. Play happens clockwise from there.',
     },
     {
       selector: statusTarget,
