@@ -5,9 +5,20 @@ import DraggableCard from '@/components/DraggableCard';
 import DroppableZone from '@/components/DroppableZone';
 import MobileOpponentStrip from '@/components/MobileOpponentStrip';
 import WildDirectionPicker from '@/components/WildDirectionPicker';
-import { Card as CardType, GameState } from '@/lib/game/types';
+import { Card as CardType, CardValue, GameState, WILD } from '@/lib/game/types';
 import { SeatSelection } from '@/components/Seat';
 import type { SeatViewModel } from '@/lib/view/seat';
+
+type BuildPile = GameState['buildPiles'][number];
+
+function topWildValueForPile(pile: BuildPile): CardValue | undefined {
+  if (pile.cards.length === 0) return undefined;
+  const top = pile.cards[pile.cards.length - 1];
+  if (!top || top.value !== WILD) return undefined;
+  if (pile.direction === 'asc') return pile.cards.length as CardValue;
+  if (pile.direction === 'desc') return (13 - pile.cards.length) as CardValue;
+  return undefined;
+}
 
 export interface MobileBoardViewProps {
   self: SeatViewModel;
@@ -116,6 +127,7 @@ export function MobileBoardView({
                       card={top}
                       size="md"
                       stacked={pile.cards.length}
+                      asValue={topWildValueForPile(pile)}
                       onClick={() => onClickBuildPile(i)}
                     />
                   )}

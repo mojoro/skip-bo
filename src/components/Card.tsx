@@ -11,6 +11,11 @@ interface CardProps {
   onClick?: () => void;
   label?: string;
   stacked?: number; // draws a slight stack effect (number of cards below)
+  // When the card is a wildcard that has been played to a build pile, the
+  // consuming component passes the number this wild is acting as — the card
+  // then renders that number prominently with a small "SB" badge so players
+  // can read the pile's value at a glance without counting cards.
+  asValue?: CardValue;
 }
 
 type CardPalette = 'blue' | 'green' | 'red' | 'wild';
@@ -38,10 +43,12 @@ const PALETTE_STYLES: Record<CardPalette, { bg: string; text: string; accent: st
     text: '#ffffff',
     accent: 'rgba(255,255,255,0.3)',
   },
+  // Deep violet with a gold accent ring — the wild now reads as premium and
+  // stands out clearly from any numbered suit.
   wild: {
-    bg: 'linear-gradient(160deg, var(--card-wild-a), var(--card-wild-b))',
-    text: '#3b1d66',
-    accent: 'rgba(75,30,130,0.25)',
+    bg: 'radial-gradient(circle at 30% 20%, #6b3cd6, var(--card-wild-a) 45%, var(--card-wild-b) 100%)',
+    text: '#ffffff',
+    accent: 'var(--card-wild-accent)',
   },
 };
 
@@ -60,6 +67,7 @@ export default function Card({
   onClick,
   label,
   stacked,
+  asValue,
 }: CardProps) {
   const S = SIZE_STYLES[size];
   const interactable = !!onClick;
@@ -101,10 +109,19 @@ export default function Card({
     );
   }
 
+  const isWild = card!.value === WILD;
   const palette = paletteFor(card!.value);
   const styles = PALETTE_STYLES[palette];
-  const isWild = card!.value === WILD;
-  const display = isWild ? 'SB' : String(card!.value);
+  // When a wild has been played onto a build pile, `asValue` tells us the
+  // number it is standing in for. The face then reads as that number while
+  // keeping the wild palette so players see at a glance "this is a wild
+  // acting as N".
+  const showingAsNumber = isWild && asValue !== undefined && asValue !== WILD;
+  const display = showingAsNumber
+    ? String(asValue)
+    : isWild
+      ? 'SB'
+      : String(card!.value);
 
   return (
     <div className="relative">
@@ -115,14 +132,18 @@ export default function Card({
         />
       )}
       <div
-        className={`${base} ${hover} ${glow} ${dimmed} border border-black/30 relative z-10 flex items-center justify-center`}
+        className={`${base} ${hover} ${glow} ${dimmed} border border-black/30 relative z-10 flex items-center justify-center overflow-hidden`}
         style={{ background: styles.bg, color: styles.text }}
         onClick={onClick}
       >
-        {/* Inner bevel ring */}
+        {/* Inner bevel ring. Wild cards get a gold ring; numbered cards stay
+            subtle so the number dominates. */}
         <div
           className="absolute inset-[3px] rounded-[4px] border pointer-events-none"
-          style={{ borderColor: styles.accent }}
+          style={{
+            borderColor: isWild ? 'var(--card-wild-accent)' : styles.accent,
+            boxShadow: isWild ? 'inset 0 0 6px rgba(242,198,90,0.35)' : undefined,
+          }}
         />
         {/* Corner rank (top-left) */}
         <div className={`absolute top-1 left-1.5 leading-none font-bold ${S.corner}`}>
@@ -136,19 +157,42 @@ export default function Card({
           {display}
         </div>
         {/* Center mark */}
-        <div className={`font-extrabold ${S.main} drop-shadow-sm`}>{display}</div>
-        {isWild && (
-          <>
-            {/* Sun rays for wild */}
-            <div
-              className="absolute inset-0 rounded-md pointer-events-none"
-              style={{
-                background:
-                  'conic-gradient(from 45deg, transparent 0deg, rgba(255,180,60,0.15) 30deg, transparent 60deg, rgba(255,180,60,0.15) 90deg, transparent 120deg, rgba(255,180,60,0.15) 150deg, transparent 180deg, rgba(255,180,60,0.15) 210deg, transparent 240deg, rgba(255,180,60,0.15) 270deg, transparent 300deg, rgba(255,180,60,0.15) 330deg, transparent 360deg)',
-                mixBlendMode: 'overlay',
-              }}
-            />
-          </>
+        <div
+          className={`font-extrabold ${S.main} drop-shadow-sm`}
+          style={isWild && !showingAsNumber ? { letterSpacing: '0.08em' } : undefined}
+        >
+          {display}
+        </div>
+
+        {/* Wild embellishments — starburst rays + gold inner ring — only on
+            the raw wildcard face, not when standing in as a number. */}
+        {isWild && !showingAsNumber && (
+          <div
+            aria-hidden
+            className="absolute inset-0 rounded-md pointer-events-none"
+            style={{
+              background:
+                'repeating-conic-gradient(from 22.5deg, rgba(242,198,90,0.18) 0deg 9deg, transparent 9deg 22.5deg)',
+              mixBlendMode: 'screen',
+              opacity: 0.55,
+            }}
+          />
+        )}
+
+        {/* When acting as a number, stamp a small gold SB chip so the wild
+            origin is still readable. */}
+        {showingAsNumber && (
+          <div
+            aria-label={`Played as ${display}, originally wild`}
+            className="absolute top-1 right-1 rounded px-1 text-[9px] font-black tracking-widest leading-none"
+            style={{
+              background: 'var(--card-wild-accent)',
+              color: '#2a0f5a',
+              boxShadow: '0 0 0 1px rgba(0,0,0,0.25)',
+            }}
+          >
+            SB
+          </div>
         )}
       </div>
     </div>

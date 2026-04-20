@@ -3,7 +3,18 @@
 import Card from '@/components/Card';
 import DroppableZone from '@/components/DroppableZone';
 import WildDirectionPicker from '@/components/WildDirectionPicker';
-import { BuildPile } from '@/lib/game/types';
+import { BuildPile, CardValue, WILD } from '@/lib/game/types';
+
+// Top of an asc pile at length N represents N; a desc pile represents 13-N.
+// Used so the Card can display "what this wild is standing in for".
+function topWildValueForPile(pile: BuildPile): CardValue | undefined {
+  if (pile.cards.length === 0) return undefined;
+  const top = pile.cards[pile.cards.length - 1];
+  if (!top || top.value !== WILD) return undefined;
+  if (pile.direction === 'asc') return pile.cards.length as CardValue;
+  if (pile.direction === 'desc') return (13 - pile.cards.length) as CardValue;
+  return undefined;
+}
 
 interface TableCenterProps {
   buildPiles: BuildPile[];
@@ -78,6 +89,7 @@ export default function TableCenter({
                     card={top}
                     size="md"
                     stacked={pile.cards.length}
+                    asValue={topWildValueForPile(pile)}
                     onClick={() => onClickBuildPile(i)}
                   />
                 )}
