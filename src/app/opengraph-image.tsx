@@ -219,6 +219,17 @@ export default function OpengraphImage() {
           >
             skipbo.johnmoorman.com
           </div>
+          <div
+            style={{
+              color: 'rgba(255,255,255,0.45)',
+              fontSize: 16,
+              fontWeight: 500,
+              marginTop: 18,
+              display: 'flex',
+            }}
+          >
+            Skip-Bo® is a trademark of Mattel · unofficial fan project
+          </div>
         </div>
 
         <div
