@@ -139,7 +139,7 @@ export default function Card({
         {/* Inner bevel ring. Wild cards get a gold ring; numbered cards stay
             subtle so the number dominates. */}
         <div
-          className="absolute inset-[3px] rounded-[4px] border pointer-events-none"
+          className="absolute inset-[3px] rounded-[3px] border pointer-events-none"
           style={{
             borderColor: isWild ? 'var(--card-wild-accent)' : styles.accent,
             boxShadow: isWild ? 'inset 0 0 6px rgba(255,245,214,0.55)' : undefined,
