@@ -32,11 +32,15 @@ const PALETTES: Record<Palette, { bg: string; fg: string; accent: string }> = {
   },
 };
 
+// Offsets are tuned so the rotated cards stay inside the right-hand 38%
+// column: the outermost ±28° card's far corner reaches ~141px past its own
+// center, so |offset| + 141 must not exceed the column half-width (228px).
+// That keeps the fan clear of the left-side info text and the right edge.
 const CARDS: Array<{ value: string; palette: Palette; rotate: number; offset: number }> = [
-  { value: '2', palette: 'blue', rotate: -28, offset: -160 },
-  { value: '4', palette: 'blue', rotate: 28, offset: 160 },
-  { value: '7', palette: 'green', rotate: -14, offset: -85 },
-  { value: '11', palette: 'red', rotate: 14, offset: 85 },
+  { value: '2', palette: 'blue', rotate: -28, offset: -80 },
+  { value: '4', palette: 'blue', rotate: 28, offset: 80 },
+  { value: '7', palette: 'green', rotate: -14, offset: -42 },
+  { value: '11', palette: 'red', rotate: 14, offset: 42 },
   { value: 'SB', palette: 'wild', rotate: 0, offset: 0 },
 ];
 
