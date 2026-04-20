@@ -115,7 +115,7 @@ export default function GameChatDock({ chat, onSend }: GameChatDockProps) {
         className="fixed z-40 w-11 h-11 rounded-full bg-black/55 hover:bg-black/75 border border-white/15 text-white flex items-center justify-center shadow-lg backdrop-blur-sm"
         style={{
           bottom: 'max(0.75rem, env(safe-area-inset-bottom))',
-          left: 'max(0.75rem, env(safe-area-inset-left))',
+          right: 'max(0.75rem, env(safe-area-inset-right))',
         }}
       >
         <svg
@@ -145,7 +145,7 @@ export default function GameChatDock({ chat, onSend }: GameChatDockProps) {
       className="fixed z-40 w-80 max-w-[92vw] rounded-xl overflow-hidden border border-white/15 bg-black/55 backdrop-blur-sm shadow-2xl flex flex-col"
       style={{
         bottom: `calc(max(0.75rem, env(safe-area-inset-bottom)) + ${keyboardOffset}px)`,
-        left: 'max(0.75rem, env(safe-area-inset-left))',
+        right: 'max(0.75rem, env(safe-area-inset-right))',
       }}
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
