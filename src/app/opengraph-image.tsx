@@ -165,15 +165,6 @@ export default function OpengraphImage() {
       >
         <div
           style={{
-            position: 'absolute',
-            inset: 0,
-            border: '2px solid #8a5a2e',
-            pointerEvents: 'none',
-          }}
-        />
-
-        <div
-          style={{
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
