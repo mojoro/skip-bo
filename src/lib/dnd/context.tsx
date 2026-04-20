@@ -61,7 +61,13 @@ export function DragDropProvider({ onDragEnd, children }: DragDropProviderProps)
       store.endDrag('cancel');
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && store.getDrag()) store.endDrag('cancel');
+      // When a drag is mid-flight, Escape cancels the drag only — stop it
+      // from also dismissing any modal/popover wired to the same key.
+      if (e.key === 'Escape' && store.getDrag()) {
+        e.preventDefault();
+        e.stopPropagation();
+        store.endDrag('cancel');
+      }
     };
     // Pointer listeners never call preventDefault here (the tabletop surface
     // sets `touch-action: none` instead), so they can run as passive and let
