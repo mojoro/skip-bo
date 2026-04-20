@@ -29,9 +29,9 @@ export default function ActionErrorToast({
     <div
       role="status"
       aria-live="polite"
-      className="fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm text-rose-100 bg-rose-900/95 ring-1 ring-rose-600/70 shadow-xl backdrop-blur-sm pointer-events-none whitespace-nowrap max-w-[92vw] overflow-hidden text-ellipsis"
+      className="fixed top-14 sm:top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-sm text-rose-100 bg-rose-900/95 ring-1 ring-rose-600/70 shadow-xl backdrop-blur-sm pointer-events-none max-w-[92vw] sm:max-w-md break-words text-center"
     >
-      <strong className="font-semibold">Action rejected:</strong> {message}
+      <strong className="font-semibold">Invalid move!</strong> {message}
     </div>
   );
 }
