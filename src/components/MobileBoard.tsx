@@ -67,7 +67,7 @@ export function MobileBoardView({
           }}
         >
           {/* Your stock — always present so you know what's on top */}
-          <div className="flex flex-col items-center gap-0.5 shrink-0">
+          <div className="flex flex-col items-center gap-0.5 shrink-0" data-tour="stock">
             {yourStockTop ? (
               <DraggableCard
                 id={`m-stock-${self.slotIndex}`}
@@ -89,7 +89,7 @@ export function MobileBoardView({
           <div className="w-px self-stretch bg-white/10 mx-1" />
 
           {/* Build piles */}
-          <div className="flex items-start gap-1">
+          <div className="flex items-start gap-1" data-tour="build">
             {buildPiles.map((pile, i) => {
               const top = pile.cards[pile.cards.length - 1] ?? null;
               const sub =
@@ -130,6 +130,7 @@ export function MobileBoardView({
 
         {/* Your hand — always fully visible */}
         <div
+          data-tour="hand"
           className="rounded-lg px-2 py-2 flex flex-col items-center gap-1"
           style={{
             background: 'rgba(0, 0, 0, 0.35)',
@@ -170,7 +171,10 @@ export function MobileBoardView({
         </div>
 
         {/* Your discard piles — drop targets + sources */}
-        <div className="rounded-lg px-2 py-2 flex flex-col items-center gap-1 bg-black/30 ring-1 ring-white/5">
+        <div
+          data-tour="discard"
+          className="rounded-lg px-2 py-2 flex flex-col items-center gap-1 bg-black/30 ring-1 ring-white/5"
+        >
           <span className="text-[9px] text-white/60 uppercase tracking-wider w-full">
             DISCARD
           </span>

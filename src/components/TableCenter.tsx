@@ -40,7 +40,7 @@ export default function TableCenter({
     >
       <div className="flex items-center gap-2 sm:gap-6 flex-wrap justify-center">
         {/* Draw pile */}
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex flex-col items-center gap-1" data-tour="draw">
           {drawPileCount > 0 ? (
             <Card card={null} faceDown size="md" stacked={Math.min(drawPileCount, 4)} />
           ) : (
@@ -52,7 +52,7 @@ export default function TableCenter({
         </div>
 
         {/* Build piles */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3" data-tour="build">
           {buildPiles.map((pile, i) => {
             const top = pile.cards[pile.cards.length - 1] ?? null;
             const sub = pile.cards.length === 0

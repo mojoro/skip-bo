@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { DragDropProvider, DragSourceData, DropTargetData } from '@/lib/dnd';
 import GameChatDock from '@/components/GameChatDock';
 import HowToPlay from '@/components/HowToPlay';
 import { MobileBoardView } from '@/components/MobileBoard';
+import OnboardingTour, { hasSeenTour } from '@/components/OnboardingTour';
 import RulesetInfo from '@/components/RulesetInfo';
 import { SeatView, SeatSelection } from '@/components/Seat';
 import TableCenter from '@/components/TableCenter';
@@ -64,6 +65,18 @@ export default function Board({
   const [pendingWildPlay, setPendingWildPlay] = useState<PendingWildPlay | null>(null);
   const [rulesetOpen, setRulesetOpen] = useState(false);
   const [howToPlayOpen, setHowToPlayOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+
+  // First-visit auto-start. Only fires once Board is actually rendering the
+  // felt — waiting/finished phases have no tour targets to anchor to. The
+  // small delay lets the felt finish its first paint so rect measurements
+  // land on the final layout, not the initial one.
+  useEffect(() => {
+    if (view.phase !== 'playing') return;
+    if (hasSeenTour()) return;
+    const id = window.setTimeout(() => setTourOpen(true), 400);
+    return () => window.clearTimeout(id);
+  }, [view.phase]);
 
   const seatViewModels = useMemo(
     () => buildSeatViewModels({ view, seats, teamColors: TEAM_COLORS }),
@@ -234,6 +247,7 @@ export default function Board({
 
             {/* Status — desktop tabletop only */}
             <div
+              data-tour="status-desktop"
               className={`${useTableLayout ? 'hidden md:block' : 'hidden'} px-3 py-1 rounded-full border border-white/10 text-xs text-white/90 text-center mx-4 truncate max-w-xl`}
               style={{ background: 'rgba(0,0,0,0.45)' }}
             >
@@ -243,6 +257,14 @@ export default function Board({
             </div>
 
             <div className="shrink-0 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTourOpen(true)}
+                className="bg-black/40 hover:bg-black/55 border border-white/15 px-2 sm:px-3 py-1 rounded text-[11px] sm:text-xs text-white/90 whitespace-nowrap"
+                aria-label="Replay onboarding tour"
+              >
+                Tour
+              </button>
               <button
                 type="button"
                 onClick={() => setHowToPlayOpen(true)}
@@ -264,6 +286,7 @@ export default function Board({
           {/* Status ribbon — mobile or compact fallback */}
           <div className={`${useTableLayout ? 'md:hidden' : ''} absolute top-10 left-2 right-2 z-10 flex justify-center pointer-events-none`}>
             <div
+              data-tour="status-mobile"
               className="px-3 py-1 rounded-full border border-white/10 text-[11px] text-white backdrop-blur-sm text-center"
               style={{ background: 'rgba(0,0,0,0.45)' }}
             >
@@ -379,6 +402,8 @@ export default function Board({
       </div>
 
       <HowToPlay open={howToPlayOpen} onClose={() => setHowToPlayOpen(false)} />
+
+      <OnboardingTour run={tourOpen} onClose={() => setTourOpen(false)} />
 
       <RulesetInfo
         open={rulesetOpen}

@@ -89,7 +89,10 @@ export function SeatView(props: SeatViewProps) {
         </div>
 
         <div className="flex items-end gap-2 sm:gap-4 flex-wrap sm:flex-nowrap">
-          <div className="flex flex-col items-center gap-1">
+          <div
+            className="flex flex-col items-center gap-1"
+            data-tour={seat.isYou ? 'stock' : undefined}
+          >
             {stockTop ? (
               <DraggableCard
                 id={`stock-${seat.slotIndex}`}
@@ -109,7 +112,10 @@ export function SeatView(props: SeatViewProps) {
             </span>
           </div>
 
-          <div className="flex flex-col items-center gap-1 min-w-0 flex-1">
+          <div
+            className="flex flex-col items-center gap-1 min-w-0 flex-1"
+            data-tour={seat.isYou ? 'hand' : undefined}
+          >
             <div className="flex gap-1 pb-1 pt-1">
               {seat.handCount === 0 && (
                 <div className="text-xs text-white/40 italic px-4">empty hand</div>
@@ -138,7 +144,10 @@ export function SeatView(props: SeatViewProps) {
             </span>
           </div>
 
-          <div className="flex flex-col items-center gap-1">
+          <div
+            className="flex flex-col items-center gap-1"
+            data-tour={seat.isYou ? 'discard' : undefined}
+          >
             <div className="flex gap-1">
               {seat.discardPiles.map((pile, i) => {
                 const top = pile[pile.length - 1] ?? null;
