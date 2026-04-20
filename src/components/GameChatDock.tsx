@@ -1,7 +1,26 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ChatEntry } from '@/lib/net/protocol';
+
+// Subscribe to a media query. useSyncExternalStore gives us a consistent
+// value on server (false) and on client hydration (real match) without the
+// setState-in-effect cascade the React Compiler flags.
+function useMatchesMedia(query: string): boolean {
+  return useSyncExternalStore(
+    (callback) => {
+      if (typeof window === 'undefined') return () => {};
+      const mql = window.matchMedia(query);
+      mql.addEventListener('change', callback);
+      return () => mql.removeEventListener('change', callback);
+    },
+    () => {
+      if (typeof window === 'undefined') return false;
+      return window.matchMedia(query).matches;
+    },
+    () => false,
+  );
+}
 
 interface GameChatDockProps {
   chat: ChatEntry[];
@@ -9,7 +28,13 @@ interface GameChatDockProps {
 }
 
 export default function GameChatDock({ chat, onSend }: GameChatDockProps) {
-  const [open, setOpen] = useState(false);
+  const isDesktop = useMatchesMedia('(min-width: 768px)');
+  // Open by default on desktop; stay collapsed on mobile where the dock would
+  // cover the tabletop. `userOverride` records an explicit user click and
+  // overrides the breakpoint default afterwards.
+  const [userOverride, setUserOverride] = useState<boolean | null>(null);
+  const open = userOverride ?? isDesktop;
+  const setOpen = (next: boolean) => setUserOverride(next);
   const [lastSeen, setLastSeen] = useState(chat.length);
   const [draft, setDraft] = useState('');
   // Extra bottom offset to keep the dock above the virtual keyboard on
