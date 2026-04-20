@@ -231,7 +231,7 @@ export default function Board({
           paddingLeft: 'max(0.5rem, env(safe-area-inset-left))',
         }}
       >
-        <div className="felt-surface relative rounded-xl overflow-hidden flex-1 min-h-0">
+        <div className="felt-surface tabletop-active relative rounded-xl overflow-hidden flex-1 min-h-0">
 
           {/* Header chrome */}
           <header className="absolute top-2 sm:top-3 left-3 right-3 sm:left-4 sm:right-4 z-20 flex items-center justify-between text-white gap-2">

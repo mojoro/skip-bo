@@ -101,8 +101,9 @@ body {
 
 /* Drag-and-drop on the tabletop uses Pointer Events; without this the
    browser fights the drag with native scroll/zoom gestures on touch devices.
-   Inputs inside this surface re-enable their own touch-action below. */
-.felt-surface {
+   Scoped to .tabletop-active so non-game surfaces (lobby, waiting room,
+   landing) keep normal scroll/pinch behaviour. */
+.tabletop-active {
   touch-action: none;
 }
 
@@ -110,7 +111,6 @@ input,
 textarea {
   user-select: auto;
   -webkit-user-select: auto;
-  touch-action: auto;
 }
 
 /* iOS Safari auto-zooms any text input whose font-size is below 16px and the
