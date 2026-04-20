@@ -172,21 +172,29 @@ export default function Card({
             boxShadow: isWild ? 'inset 0 0 6px rgba(255,245,214,0.55)' : undefined,
           }}
         />
-        {/* Corner rank (top-left) */}
-        <div className={`absolute top-1 left-1.5 leading-none font-bold ${S.corner}`}>
-          {display}
-        </div>
-        {/* Corner rank (bottom-right, rotated) */}
-        <div
-          className={`absolute bottom-1 right-1.5 leading-none font-bold ${S.corner}`}
-          style={{ transform: 'rotate(180deg)' }}
-        >
-          {display}
-        </div>
+        {/* Corner ranks — hidden on tiny wild cards where the two-letter "SB"
+            crowds the face and the palette alone already identifies the card. */}
+        {!(isWild && size === 'sm') && (
+          <>
+            <div className={`absolute top-1 left-1.5 leading-none font-bold ${S.corner}`}>
+              {display}
+            </div>
+            <div
+              className={`absolute bottom-1 right-1.5 leading-none font-bold ${S.corner}`}
+              style={{ transform: 'rotate(180deg)' }}
+            >
+              {display}
+            </div>
+          </>
+        )}
         {/* Center mark */}
         <div
           className={`font-extrabold ${S.main} drop-shadow-sm`}
-          style={isWild && !showingAsNumber ? { letterSpacing: '0.08em' } : undefined}
+          style={
+            isWild && !showingAsNumber && size !== 'sm'
+              ? { letterSpacing: '0.08em' }
+              : undefined
+          }
         >
           {display}
         </div>
