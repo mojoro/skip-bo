@@ -107,7 +107,7 @@ export function SeatView(props: SeatViewProps) {
             ) : (
               <Card card={null} size={cardSize} label="empty" />
             )}
-            <span className="text-[10px] text-white/70 tracking-widest">
+            <span className="text-[10px] text-white/70 tracking-widest tabular-nums">
               STOCK · {seat.stockCount}
             </span>
           </div>
@@ -139,7 +139,7 @@ export function SeatView(props: SeatViewProps) {
                     <Card key={`hand-back-${i}`} card={null} faceDown size={cardSize} />
                   ))}
             </div>
-            <span className="text-[10px] text-white/70 tracking-widest">
+            <span className="text-[10px] text-white/70 tracking-widest tabular-nums">
               HAND · {seat.handCount}
             </span>
           </div>
@@ -188,7 +188,7 @@ export function SeatView(props: SeatViewProps) {
                     ) : (
                       card
                     )}
-                    <span className="text-[9px] text-white/50">{pile.length}</span>
+                    <span className="text-[9px] text-white/50 tabular-nums">{pile.length}</span>
                   </div>
                 );
               })}

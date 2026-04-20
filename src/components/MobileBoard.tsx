@@ -118,7 +118,7 @@ export function MobileBoardView({
             ) : (
               <Card card={null} size="md" label="empty" />
             )}
-            <span className="text-[9px] text-white/70 tracking-widest whitespace-nowrap">
+            <span className="text-[9px] text-white/70 tracking-widest whitespace-nowrap tabular-nums">
               STOCK · {self.stockCount}
             </span>
           </div>
@@ -192,7 +192,7 @@ export function MobileBoardView({
                 <span className="text-[var(--gold)] ml-1">· your turn</span>
               )}
             </span>
-            <span className="text-[9px] text-white/60 uppercase tracking-wider">
+            <span className="text-[9px] text-white/60 uppercase tracking-wider tabular-nums">
               HAND · {self.handCount}
             </span>
           </div>
@@ -261,7 +261,7 @@ export function MobileBoardView({
                   >
                     {cardEl}
                   </DroppableZone>
-                  <span className="text-[9px] text-white/50">{pile.length}</span>
+                  <span className="text-[9px] text-white/50 tabular-nums">{pile.length}</span>
                 </div>
               );
             })}

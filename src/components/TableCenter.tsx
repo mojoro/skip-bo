@@ -85,7 +85,7 @@ export default function TableCenter({
           ) : (
             <Card card={null} size="md" label="empty" />
           )}
-          <span className="text-[10px] text-white/80 tracking-widest font-semibold">
+          <span className="text-[10px] text-white/80 tracking-widest font-semibold tabular-nums">
             DRAW · {drawPileCount}
           </span>
         </div>
@@ -146,7 +146,7 @@ export default function TableCenter({
         <div className="flex flex-col items-center gap-1 opacity-80">
           {completedPileCount > 0 ? (
             <div
-              className="w-16 h-24 rounded-md border border-white/20 flex items-center justify-center text-white/70 text-xs font-semibold"
+              className="w-16 h-24 rounded-md border border-white/20 flex items-center justify-center text-white/70 text-xs font-semibold tabular-nums"
               style={{
                 background:
                   'linear-gradient(160deg, rgba(255,255,255,0.05), rgba(0,0,0,0.35))',
