@@ -45,6 +45,7 @@ export interface PublicPlayerView {
   stateVersion: number;
   buildPiles: BuildPile[];
   drawPileCount: number;
+  completedPileCount: number;
   you: PublicPlayerState;
   opponents: PublicOpponentView[];
 }
@@ -181,6 +182,7 @@ export function buildGameView(room: Room, sessionId: string, seats?: GameViewSea
     stateVersion: raw.stateVersion,
     buildPiles: raw.buildPiles,
     drawPileCount: raw.drawPileCount,
+    completedPileCount: raw.completedPileCount,
     you: youRest,
     opponents: publicizeOpponents(room, raw.opponents),
   };

@@ -404,6 +404,9 @@ export interface PlayerView {
   stateVersion: number;
   buildPiles: BuildPile[];
   drawPileCount: number;
+  // Number of completed 12-card build stacks waiting to be reshuffled into
+  // the draw pile. Exposed so the UI can render the completed-piles column.
+  completedPileCount: number;
   youIndex: number;
   you: PlayerState;
   opponents: OpponentView[];
@@ -433,6 +436,7 @@ export function getPlayerView(state: GameState, playerId: string): PlayerView {
     stateVersion: state.stateVersion,
     buildPiles: state.buildPiles.map((b) => ({ cards: [...b.cards], direction: b.direction })),
     drawPileCount: state.drawPile.length,
+    completedPileCount: Math.floor(state.completedBuildPiles.length / 12),
     youIndex,
     you: {
       id: you.id,

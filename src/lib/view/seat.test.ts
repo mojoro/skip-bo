@@ -27,6 +27,7 @@ function baseView(): PlayerView {
     stateVersion: 1,
     buildPiles: [],
     drawPileCount: 100,
+    completedPileCount: 0,
     you: {
       name: 'Alice',
       hand: [makeCard('h1', 3), makeCard('h2', 7)],

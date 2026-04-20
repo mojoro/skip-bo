@@ -40,6 +40,7 @@ export function engineStateToView(state: GameState, youPlayerIndex: number): Gam
     stateVersion: state.stateVersion,
     buildPiles: state.buildPiles,
     drawPileCount: state.drawPile.length,
+    completedPileCount: Math.floor(state.completedBuildPiles.length / 12),
     you: {
       name: you.name,
       hand: you.hand,

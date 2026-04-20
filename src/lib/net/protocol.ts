@@ -46,6 +46,7 @@ export interface PlayerView {
   stateVersion: number;
   buildPiles: GameState['buildPiles'];
   drawPileCount: number;
+  completedPileCount: number;
   you: PublicPlayerState;
   opponents: OpponentView[];
 }

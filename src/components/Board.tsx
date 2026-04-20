@@ -302,7 +302,7 @@ export default function Board({
               <TableCenter
                 buildPiles={view.buildPiles}
                 drawPileCount={view.drawPileCount}
-                completedPileCount={0}
+                completedPileCount={view.completedPileCount}
                 config={view.config}
                 onClickBuildPile={onClickBuildPile}
                 pendingWildBuildPileIndex={pendingWildPlay?.buildPileIndex ?? null}
@@ -350,7 +350,7 @@ export default function Board({
                 opponents={opponentSeats}
                 buildPiles={view.buildPiles}
                 drawPileCount={view.drawPileCount}
-                completedPileCount={0}
+                completedPileCount={view.completedPileCount}
                 config={view.config}
                 selection={isYourTurn ? selection : { kind: 'none' }}
                 onSelectHand={isYourTurn ? (idx) =>
