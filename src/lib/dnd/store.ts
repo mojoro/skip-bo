@@ -85,6 +85,17 @@ export class DragDropStore {
     this.targets.set(id, reg);
   }
 
+  /**
+   * Update a target's `data` payload without re-creating the Map entry. The
+   * data object is usually an inline literal on the consumer, so a naive
+   * re-register would churn the Map on every render; patching in place keeps
+   * the registry stable.
+   */
+  updateTargetData(id: string, data: DropTargetData): void {
+    const existing = this.targets.get(id);
+    if (existing) existing.data = data;
+  }
+
   unregisterTarget(id: string): void {
     this.targets.delete(id);
   }

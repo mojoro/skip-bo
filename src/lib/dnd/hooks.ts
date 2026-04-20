@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useDragDropStore } from './context';
 import { DragSourceData, DropTargetData } from './types';
 
@@ -40,6 +40,13 @@ export function useDroppable({ id, data, disabled }: UseDroppableOptions): UseDr
     },
     [id, disabled, store],
   );
+
+  // Consumers pass inline object literals for `data`, so its reference changes
+  // every render. Patch the registered target in place rather than letting the
+  // ref callback re-register on every pass.
+  useEffect(() => {
+    store.updateTargetData(id, data);
+  }, [id, data, store]);
 
   return { ref, isOver };
 }
