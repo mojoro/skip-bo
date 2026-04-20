@@ -16,6 +16,34 @@ function topWildValueForPile(pile: BuildPile): CardValue | undefined {
   return undefined;
 }
 
+// Chunky arrow icon. Classic rectangular-stem shape with a triangular head,
+// rendered as an inline SVG so the weight is consistent across fonts and
+// platforms (unicode arrows render too thin or too clunky depending on the
+// system font).
+function DirectionArrow({
+  direction,
+  size = 14,
+  color = 'var(--gold)',
+}: { direction: 'asc' | 'desc'; size?: number; color?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 14 16"
+      aria-hidden
+      style={{ transform: direction === 'asc' ? undefined : 'rotate(180deg)' }}
+    >
+      <path
+        d="M7 1.2 L13 7.6 L9.6 7.6 L9.6 14.8 L4.4 14.8 L4.4 7.6 L1 7.6 Z"
+        fill={color}
+        stroke="rgba(0,0,0,0.35)"
+        strokeWidth="0.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 interface TableCenterProps {
   buildPiles: BuildPile[];
   drawPileCount: number;
@@ -66,9 +94,6 @@ export default function TableCenter({
         <div className="flex items-center gap-2 sm:gap-3" data-tour="build">
           {buildPiles.map((pile, i) => {
             const top = pile.cards[pile.cards.length - 1] ?? null;
-            const sub = pile.cards.length === 0
-              ? emptyLabel
-              : `${pile.direction?.toUpperCase()} · ${pile.cards.length}/12`;
             const isPendingWild = pendingWildBuildPileIndex === i;
             return (
               <DroppableZone
@@ -93,9 +118,25 @@ export default function TableCenter({
                     onClick={() => onClickBuildPile(i)}
                   />
                 )}
-                <span className="text-[9px] sm:text-[10px] text-white/75 tracking-wider text-center leading-tight w-16 sm:w-auto">
-                  {isPendingWild ? 'pick direction' : sub}
-                </span>
+                {isPendingWild ? (
+                  <span className="text-[9px] sm:text-[10px] text-white/75 tracking-wider text-center leading-tight w-16 sm:w-auto">
+                    pick direction
+                  </span>
+                ) : pile.cards.length === 0 ? (
+                  <span className="text-[9px] sm:text-[10px] text-white/75 tracking-wider text-center leading-tight w-16 sm:w-auto">
+                    {emptyLabel}
+                  </span>
+                ) : (
+                  <div
+                    className="flex items-center gap-1.5 leading-none"
+                    aria-label={pile.direction === 'asc' ? 'ascending' : 'descending'}
+                  >
+                    {pile.direction && <DirectionArrow direction={pile.direction} size={13} />}
+                    <span className="text-[13px] font-bold text-white/90 tabular-nums leading-none">
+                      {pile.cards.length}/12
+                    </span>
+                  </div>
+                )}
               </DroppableZone>
             );
           })}

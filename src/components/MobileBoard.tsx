@@ -20,6 +20,32 @@ function topWildValueForPile(pile: BuildPile): CardValue | undefined {
   return undefined;
 }
 
+// Chunky SVG arrow so build-pile direction reads at a glance on mobile
+// without relying on system-dependent unicode glyphs.
+function DirectionArrow({
+  direction,
+  size = 16,
+  color = 'var(--gold)',
+}: { direction: 'asc' | 'desc'; size?: number; color?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 14 16"
+      aria-hidden
+      style={{ transform: direction === 'asc' ? undefined : 'rotate(180deg)' }}
+    >
+      <path
+        d="M7 1.2 L13 7.6 L9.6 7.6 L9.6 14.8 L4.4 14.8 L4.4 7.6 L1 7.6 Z"
+        fill={color}
+        stroke="rgba(0,0,0,0.35)"
+        strokeWidth="0.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export interface MobileBoardViewProps {
   self: SeatViewModel;
   opponents: SeatViewModel[];
@@ -103,10 +129,6 @@ export function MobileBoardView({
           <div className="flex items-start gap-1" data-tour="build">
             {buildPiles.map((pile, i) => {
               const top = pile.cards[pile.cards.length - 1] ?? null;
-              const sub =
-                pile.cards.length === 0
-                  ? emptyLabel
-                  : `${pile.direction === 'asc' ? '↑' : '↓'}${pile.cards.length}`;
               const isPendingWild = pendingWildBuildPileIndex === i;
               return (
                 <DroppableZone
@@ -131,9 +153,21 @@ export function MobileBoardView({
                       onClick={() => onClickBuildPile(i)}
                     />
                   )}
-                  <span className="text-[9px] text-white/70 whitespace-nowrap">
-                    {isPendingWild ? 'pick' : sub}
-                  </span>
+                  {isPendingWild ? (
+                    <span className="text-[9px] text-white/70 whitespace-nowrap">pick</span>
+                  ) : pile.cards.length === 0 ? (
+                    <span className="text-[9px] text-white/70 whitespace-nowrap">{emptyLabel}</span>
+                  ) : (
+                    <div
+                      className="flex items-center gap-1.5 leading-none"
+                      aria-label={pile.direction === 'asc' ? 'ascending' : 'descending'}
+                    >
+                      {pile.direction && <DirectionArrow direction={pile.direction} size={15} />}
+                      <span className="text-[14px] font-bold text-white/90 tabular-nums leading-none">
+                        {pile.cards.length}/12
+                      </span>
+                    </div>
+                  )}
                 </DroppableZone>
               );
             })}
