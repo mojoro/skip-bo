@@ -75,6 +75,10 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
   const outboundRef = useRef<ClientMessage[]>([]);
   const attemptRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Mirror of the stateVersion setter so onmessage can compare against the
+  // latest value without pulling `stateVersion` into `connect`'s deps (which
+  // would rebuild the whole WS on every state bump).
+  const stateVersionRef = useRef(0);
 
   const connect = useCallback(() => {
     // Skip when either identifier is still hydrating. The room page reads
@@ -104,10 +108,25 @@ export function useGameSocket(roomId: string, sessionId: string): GameSocket {
       try { msg = JSON.parse(ev.data as string) as ServerMessage; } catch { return; }
       switch (msg.type) {
         case 'hello':
-        case 'state':
-        case 'gameEnded':
+          // A `hello` is the authoritative state at connect time — including
+          // the first frame of a fresh room after rematch, where the new
+          // stateVersion (0) is numerically below the last-seen value from
+          // the previous room. Always apply it and reset the watermark.
           setView(msg.view);
           setStateVersion(msg.stateVersion);
+          stateVersionRef.current = msg.stateVersion;
+          break;
+        case 'state':
+        case 'gameEnded':
+          // Drop stale frames that arrive out of order. stateVersion grows
+          // monotonically within a game, so anything at or below the current
+          // watermark is either a duplicate (idempotent, cheap to skip) or a
+          // late reconnect-race frame that would rewind the UI to an earlier
+          // turn.
+          if (msg.stateVersion <= stateVersionRef.current) break;
+          setView(msg.view);
+          setStateVersion(msg.stateVersion);
+          stateVersionRef.current = msg.stateVersion;
           break;
         case 'actionError':
           setLastActionError({ reason: msg.reason });
