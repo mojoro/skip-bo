@@ -128,7 +128,10 @@ export default function Card({
           className={`${base} ${hover} ${glow} ${dimmed} card-back border border-black/30 flex items-center justify-center relative z-10`}
           onClick={onClick}
         >
-          <div className="w-8 h-8 rounded-full bg-white/15 border border-white/35 flex items-center justify-center text-[10px] font-bold text-white/80 tracking-widest">
+          <div
+            className="w-8 h-8 rounded-full bg-white/15 border border-white/35 flex items-center justify-center text-[10px] font-bold text-white/80 tracking-widest"
+            style={{ textIndent: '0.1em' }}
+          >
             SB
           </div>
         </div>
@@ -210,6 +213,10 @@ export default function Card({
               background: 'var(--card-wild-accent)',
               color: '#3d1a04',
               boxShadow: '0 0 0 1px rgba(0,0,0,0.25)',
+              // tracking-widest adds trailing letter-spacing after the final
+              // glyph, visually shifting "SB" left inside the pill; matching
+              // text-indent restores optical centering.
+              textIndent: '0.1em',
             }}
           >
             SB
