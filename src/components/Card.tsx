@@ -16,6 +16,32 @@ interface CardProps {
   // then renders that number prominently with a small "SB" badge so players
   // can read the pile's value at a glance without counting cards.
   asValue?: CardValue;
+  // When the card is the top of a build pile, the consuming component passes
+  // the pile's direction so the card renders a small chevron in its top-right
+  // corner indicating which way the pile is climbing.
+  buildDirection?: 'asc' | 'desc';
+}
+
+// Inline chevron for build-pile direction. White so it reads on every card
+// palette without extra theming.
+function DirectionChevron({ direction, size }: { direction: 'asc' | 'desc'; size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 14 16"
+      aria-hidden
+      style={{ transform: direction === 'asc' ? undefined : 'rotate(180deg)' }}
+    >
+      <path
+        d="M7 1.2 L13 7.6 L9.6 7.6 L9.6 14.8 L4.4 14.8 L4.4 7.6 L1 7.6 Z"
+        fill="#ffffff"
+        stroke="rgba(0,0,0,0.55)"
+        strokeWidth="0.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 type CardPalette = 'blue' | 'green' | 'red' | 'wild';
@@ -68,6 +94,7 @@ export default function Card({
   label,
   stacked,
   asValue,
+  buildDirection,
 }: CardProps) {
   const S = SIZE_STYLES[size];
   const interactable = !!onClick;
@@ -164,26 +191,13 @@ export default function Card({
           {display}
         </div>
 
-        {/* Wild embellishments — starburst rays + gold inner ring — only on
-            the raw wildcard face, not when standing in as a number. */}
-        {isWild && !showingAsNumber && (
-          <div
-            aria-hidden
-            className="absolute inset-0 rounded-md pointer-events-none"
-            style={{
-              background:
-                'repeating-conic-gradient(from 22.5deg, rgba(255,245,214,0.28) 0deg 9deg, transparent 9deg 22.5deg)',
-              opacity: 0.7,
-            }}
-          />
-        )}
-
-        {/* When acting as a number, stamp a small gold SB chip so the wild
-            origin is still readable. */}
+        {/* When acting as a number, stamp a small gold SB chip in the
+            bottom-left so the wild origin is still readable without
+            colliding with the build-direction arrow at top-right. */}
         {showingAsNumber && (
           <div
             aria-label={`Played as ${display}, originally wild`}
-            className="absolute top-1 right-1 rounded px-1 text-[9px] font-black tracking-widest leading-none"
+            className="absolute bottom-1 left-1 rounded px-1 text-[9px] font-black tracking-widest leading-none"
             style={{
               background: 'var(--card-wild-accent)',
               color: '#3d1a04',
@@ -191,6 +205,16 @@ export default function Card({
             }}
           >
             SB
+          </div>
+        )}
+
+        {/* Build-pile direction arrow, white so it pops on every palette. */}
+        {buildDirection && (
+          <div
+            className="absolute top-1 right-1 leading-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
+            aria-label={buildDirection === 'asc' ? 'ascending pile' : 'descending pile'}
+          >
+            <DirectionChevron direction={buildDirection} size={size === 'lg' ? 14 : size === 'md' ? 12 : 10} />
           </div>
         )}
       </div>
